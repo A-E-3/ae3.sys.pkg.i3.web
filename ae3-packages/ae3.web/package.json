@@ -1,0 +1,6 @@
+{
+	"type" : "ae3.Package",
+	"name" : "ae3.web",
+	"description" : "AE3 Web Package",
+	"requires" : "ae3.network"
+}

@@ -1,0 +1,15 @@
+Type: ae3.Package
+Name: ae3.sys.pkg.i3.web
+Info: Base Web (UI) SDK and tools
+Requires: \
+	ae3.api \
+	ae3.sdk \
+	ae3.base \
+
+Provides: \
+	ae3.web \
+	ae3.web.server \
+	ae3.web.server-docs \
+	--source-process:compile-java \
+	source-process:ae3-packages \
+

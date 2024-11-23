@@ -1,0 +1,5 @@
+Layouts.extend(require('ru.acmcms.types/Server'), {
+	skin	: require('ru.acmcms.skins/Unknown'),
+	title	: "Unknown",
+	keywords: null
+})

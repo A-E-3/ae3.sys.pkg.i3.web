@@ -1,0 +1,7 @@
+Telnet Data Encryption Option
+http://tools.ietf.org/html/rfc2946 
+
+Telnet Authentication Option
+http://tools.ietf.org/html/rfc2941
+
+see http://www.faqs.org/rfcs/rfc2951.html

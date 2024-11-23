@@ -1,0 +1,8 @@
+{
+	"type" : "ae3.Package",
+	"name" : "ae3.web.server",
+	"description" : "ae3.Package",
+	"version" : "1.0",
+	"provides" : "web",
+	"requires" : "ae3.web"
+}
