@@ -1,7 +1,11 @@
-const ae3 = require('ae3');
+const ae3 = require("ae3");
 
 const Transfer = ae3.Transfer;
 const Concurrent = ae3.Concurrent;
+
+const TransferCreateBufferUtf8 = Transfer.createBufferUtf8;
+const TransferCreateCopierUtf8 = Transfer.createCopierUtf8;
+const TransferCreateCopierFromBinary = Transfer.createCopierFromBinary;
 
 const FutureSimpleObject = Concurrent.FutureSimpleUnknown;
 const FutureSimpleString = Concurrent.FutureSimpleString;
@@ -14,7 +18,7 @@ const ReplyParser = require('java.class/ru.myx.ae3.i3.web.http.client.ReplyParse
  */
 const Stats = require('java.class/ru.myx.ae3.i3.web.http.client.HttpClientStatusProvider');
 
-const URL = require('url');
+// const UrlParseFn = URL.parse; // currently need to throw error
 
 /**
  * Future is sent as 'this' value
@@ -230,12 +234,12 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 			/**
 			 * makes NULL copier
 			 */
-			body = Transfer.createCopierUtf8(null);
+			body = TransferCreateCopierUtf8(null);
 			break;
 		case 'string':
 		case 'number':
 		case 'boolean':
-			body = Transfer.createCopierUtf8(String(body));
+			body = TransferCreateCopierUtf8(String(body));
 			var cType = headers['Content-Type'];
 			if(!cType){
 				headers['Content-Type'] = 'text/plain; charset=utf-8';
@@ -250,7 +254,7 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 			continue;
 		// case 'object':
 		default:
-			body = Transfer.createCopierFromBinary(body);
+			body = TransferCreateCopierFromBinary(body);
 			break;
 		}
 		break;
@@ -266,7 +270,8 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 	$output(output){
 		= method;
 		= path[0] === '/' ? ' ' : ' /';
-		= path || '';
+		= path ?? '';
+		= parameters.search ?? '';
 		if(parameters.protocolVariant){
 			= " "; 
 			= parameters.protocolVariant;
@@ -275,7 +280,7 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 			= " HTTP/1.1\r\n";
 		}
 		
-		for keys(key in headers){
+		for(key in headers){
 			= key;
 			= ": ";
 			= headers[key];
@@ -295,7 +300,7 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 
 	if(parameters.callbackOnSent){
 		// console.log(">>> >>> $$$$$ callbackOnSent 1, socket=" + socket);
-		socket.target.absorbBuffer(Transfer.createBufferUtf8(output));
+		socket.target.absorbBuffer(TransferCreateBufferUtf8(output));
 		body.length() && socket.target.absorbBuffer(body.nextCopy());
 		socket.target.force();
 		// console.log(">>> >>> $$$$$ callbackOnSent 2, socket=" + socket);
@@ -316,7 +321,7 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 
 	socket.source.connectTarget(parser);
 	
-	socket.target.absorbBuffer(Transfer.createBufferUtf8(output));
+	socket.target.absorbBuffer(TransferCreateBufferUtf8(output));
 	body.length() && socket.target.absorbBuffer(body.nextCopy());
 	socket.target.force();
 	// console.log(">>> >>> $$$$$ socket=" + socket + ", query=" + Format.jsString(output) + ", body.length=" + body.nextCopy().remaining());
@@ -327,7 +332,8 @@ function internParametersForGet(urlStrOrMap){
 		throw new Error('string or object parameter is expected!');
 	}
 	if('string' === typeof urlStrOrMap){
-		return URL.parse(urlStrOrMap);
+		return new URL(urlStrOrMap);
+		// return UrlParseFn(urlStrOrMap) ?? (new Error("Invalid URL spec: " + urlStrOrMap)).throw();
 	}
 	if(!urlStrOrMap.path || !(urlStrOrMap.host || urlStrOrMap.hostname)){
 		throw new Error("Invalid 'url' object contents!");
@@ -336,11 +342,11 @@ function internParametersForGet(urlStrOrMap){
 }
 
 function internParametersForPost(urlStrOrMap, postParameters){
-	var original = internParametersForGet(urlStrOrMap);
+	const original = internParametersForGet(urlStrOrMap);
 	if(!postParameters){
-		throw new Error("No postParameters argument value!");
+		return original;
 	}
-	var parameters = Object.create(original);
+	const parameters = Object.create(original);
 	parameters.method = "POST";
 	parameters.headers = original.headers ? Object.create(original.headers) : {};
 	parameters.headers["Content-Type"] = "application/x-www-form-urlencoded; charset=utf-8";
@@ -396,30 +402,24 @@ httpGet.asBinary = function httpGetReturnBinary(urlStrOrMap, callback){
  * @param callback
  */
 function httpPost(urlStrOrMap, postParameters, callback){
-	return postParameters
-		? httpRequest(
-			internParametersForPost(urlStrOrMap, postParameters), 
-			internCallback(urlStrOrMap, callback)
-		)
-		: httpGet(urlStrOrMap, callback);
+	return httpRequest(
+		internParametersForPost(urlStrOrMap, postParameters), 
+		internCallback(urlStrOrMap, callback)
+	);
 }
 
 httpPost.asString = function httpPostReturnString(urlStrOrMap, postParameters, callback){
-	return postParameters
-	? httpRequest.asString(
+	return httpRequest.asString(
 		internParametersForPost(urlStrOrMap, postParameters), 
 		internCallback(urlStrOrMap, callback)
-	)
-	: httpGet.asString(urlStrOrMap, callback);
+	);
 };
 
 httpPost.asBinary = function httpPostReturnBinary(urlStrOrMap, postParameters, callback){
-	return postParameters
-	? httpRequest.asBinary(
+	return httpRequest.asBinary(
 		internParametersForPost(urlStrOrMap, postParameters), 
 		internCallback(urlStrOrMap, callback)
-	)
-	: httpGet.asBinary(urlStrOrMap, callback);
+	);
 };
 
 /**
@@ -437,7 +437,7 @@ httpPost.asBinary = function httpPostReturnBinary(urlStrOrMap, postParameters, c
  */
 function httpRequest(parameters, callback){
 	if(!callback){
-		var future = new FutureSimpleObject();
+		const future = new FutureSimpleObject();
 		/*future.cancellable = */httpRequest(parameters, internCallbackSetFuture.bind(future, parameters));
 		return future;
 	}
@@ -473,7 +473,7 @@ function httpRequest(parameters, callback){
  */
 httpRequest.asString = function(parameters, callback){
 	if(!callback){
-		var future = new FutureSimpleString();
+		const future = new FutureSimpleString();
 		/*future.cancellable = */httpRequest.asString(parameters, internCallbackSetFuture.bind(future, parameters));
 		return future;
 	}
@@ -510,7 +510,6 @@ httpRequest.asBinary = function(parameters, callback){
 
 
 module.exports = {
-	ClientRequest : ClientRequest,
 	/**
 	 * get.
 	 * 

@@ -1,4 +1,4 @@
-const ae3 = require('ae3');
+const ae3 = require("ae3");
 
 /**
  * TODO: robots.txt
@@ -9,6 +9,7 @@ const ae3 = require('ae3');
  * 
  */
 
+const LAST_EXCEPTION = Object.create(null);
 
 const Share = module.exports = ae3.Class.create(
 	/* name */
@@ -18,14 +19,17 @@ const Share = module.exports = ae3.Class.create(
 	/* constructor */
 	function(settings){
 		this.AbstractWebPage();
-		Object.defineProperty(this, "dateStarted", {
-			value : new Date()
+		Object.defineProperties(this, {
+			dateStarted :{
+				value : new Date()
+			},
+			settings : {
+				value : settings || undefined
+			},
+			lastException : {
+				value : {}
+			}
 		});
-		if(settings){
-			Object.defineProperty(this, "settings", {
-				value : settings
-			});
-		}
 		return this;
 	},
 	/* inherit */
@@ -34,7 +38,7 @@ const Share = module.exports = ae3.Class.create(
 			value : undefined
 		},
 		helper : {
-			value : require('ae3.l2.xml/helper')
+			value : require('ae3.l2.xml/XmlSkinHelperSingleton')
 		},
 		/**
 		 * actual index commands
@@ -181,19 +185,20 @@ const Share = module.exports = ae3.Class.create(
 			value : function onException(context, e){
 				const share = context.share;
 				const value = e.thrownValue;
-				if(value && value.layout){
-					return value;
+				if(value?.layout){
+					return LAST_EXCEPTION.layout = value;
 				}
 				if(value || e.thrownDetail){
-					return {
+					return LAST_EXCEPTION.layout = {
 						layout : 'message',
-						code : Number((e.thrownValue && e.thrownValue.code) || 409),
-						reason : (e.thrownValue && e.message) || 'Request Error',
-						message : e.thrownValue || e.message || e,
+						origin : "ae3.web/Share:: onException",
+						code : Number(value?.code || 409),
+						reason : (value && e.message) || 'Request Error',
+						message : value || e.message || e,
 						detail : e.thrownDetail || undefined
 					};
 				}
-				return share.makeServerFailureLayout(e.message || e, Format.throwableAsPlainText(e));
+				return LAST_EXCEPTION.layout = share.makeServerFailureLayout(e.message || e, Format.throwableAsPlainText(e));
 			}
 		},
 		authCheckAccountMembership : {
@@ -409,5 +414,36 @@ const Share = module.exports = ae3.Class.create(
 				return result;
 			}
 		},
+	},
+	{
+		"getLastExceptionLayout" : {
+			value : function(reset){
+				if(reset){
+					try{
+						return Share.getLastExceptionLayout();
+					}finally{
+						LAST_EXCEPTION.layout = null;
+					}
+				}
+				return LAST_EXCEPTION.layout;
+			}
+		},
+		"getLastExceptionLayoutOrOk" : {
+			value : function(reset){
+				if(reset){
+					try{
+						return Share.getLastExceptionLayoutOrOk();
+					}finally{
+						LAST_EXCEPTION.layout = null;
+					}
+				}
+				return LAST_EXCEPTION.layout ??  {
+					code : 200,
+					layout : "message",
+					message : "No exception recorded since boot/reset."
+				};
+			}
+		}
+		
 	}
 );

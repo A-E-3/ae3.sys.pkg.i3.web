@@ -2,7 +2,7 @@
  * TODO: ready-support for "/resources/"
  */
 
-const UrlParseFn = require("url").parse;
+const UrlParseFn = URL.parse;
 
 function buildIndexMenuReply(context, client, admin){
 	const query = context.query;
@@ -15,7 +15,7 @@ function buildIndexMenuReply(context, client, admin){
 					parameters.ref.substring(query.resourcePrefix.length) || undefined;
 		var extras = extra && [];
 		indexPushAllHtmlJs(index, this, "/", extra, extras, client, admin);
-		if(extras && extras.length){
+		if(extras?.length){
 			extras.push({
 				"icon" : this.icon || "house",
 				"title" : "Root Menu",
@@ -318,7 +318,7 @@ const IndexPage = module.exports = require("ae3").Class.create(
 				const commands = props.commands;
 				if(commands){
 					page.commands = commands;
-					commands.index && (commands.index.run ||= page);
+					// commands.index && (commands.index.run ||= page);
 				}
 				
 				return page;
@@ -369,8 +369,16 @@ function indexPushAllHtmlJs(targetArray, index, prefix, extra, extras, client, a
 			(x = command.preview) && (item.preview = x);
 			
 			if(command.group){
-				extra && extra.startsWith(link) && extras.unshift(item);
-				indexPushAllHtmlJs(item.submenu = [], index.getCommandHandler(command, key), link, extra, extras, client, admin);
+				extra?.startsWith(link) && extras.unshift(item);
+				indexPushAllHtmlJs(
+					item.submenu = [], 
+					index.getCommandHandler(command, key) ?? (key === "index" && index), 
+					link, 
+					extra, 
+					extras, 
+					client, 
+					admin
+				);
 			}
 		}
 	}
@@ -382,7 +390,12 @@ function internMakeLoginOptions(query, share, Index){
 	var xml = "";
 	$output(xml){
 		if(url.startsWith("http://") && query.toSecureChannel()){
-			var parsed = UrlParseFn(url);
+			const parsed = UrlParseFn(url);
+			false && console.log(
+				"Web::IndexPage:internMakeLoginOptions: insecure (with secure service available), %s, %s", 
+				Format.jsObject(query.settings),
+				Format.jsObject(share.settings)
+			);
 			= Format.xmlElement("command", {
 				icon : "lock_go",
 				title : "Switch to secure connection",
@@ -390,7 +403,7 @@ function internMakeLoginOptions(query, share, Index){
 					? "/?secure-login" 
 					: "https" + url.substring(4)
 			});
-			if((share.settings || {})["custom-root-ca-pki-location"]){
+			if(share.settings?.["custom-root-ca-pki-location"]){
 				= Format.xmlElement("command", {
 					icon : "accept",
 					title : "The certificate to be trusted for secure connection with this server",
@@ -407,6 +420,11 @@ function internMakeLoginOptions(query, share, Index){
 				});
 			}
 		}else{
+			false && console.log(
+				"Web::IndexPage:internMakeLoginOptions: secure (or no secure service available), %s, %s", 
+				Format.jsObject(query.settings),
+				Format.jsObject(share.settings)
+			);
 			= Format.xmlElement("command", {
 				key : "?login",
 				icon : "key_go",
@@ -488,7 +506,13 @@ function indexOutAllXml(index, prefix, client, admin, depth){
 			
 			if(command.group){
 				%><index layout="menu" <%= Format.xmlAttributes(item) %>><%
-					= indexOutAllXml(index.getCommandHandler(command, key), link, client, admin, depth + 1);
+					= indexOutAllXml(
+						index.getCommandHandler(command, key) ?? (key === "index" && index), 
+						link, 
+						client, 
+						admin, 
+						depth + 1
+					);
 				%></index><%
 			}else{
 				= Format.xmlElement("command", item);

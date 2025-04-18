@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="java"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.api"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sdk"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.html"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.json"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.text"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.xls"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.xml"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/ae3.sys.pkg.l2.tgt.pdf"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

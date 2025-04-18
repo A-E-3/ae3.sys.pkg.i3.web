@@ -1983,7 +1983,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				return;
 			
 			case RU_10_INIT :
-				throw new IllegalStateException("Parser state is INIT, parser: " + this);
+				// throw new IllegalStateException("Parser state is INIT, parser: " + this);
+				HandlerQueue.reuseParser(this, this.queueIndex);
+				return;
 			
 			default :
 				if ((this.reuse & SocketHandler.RU_08_OPEN) != 0) {
@@ -2139,7 +2141,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 							if (key.length() == 4 && key.charAt(0) == '_') {
 								if (key.equals("_ic_")) {
 									this.qInputCharset = Charset.forName(val);
-									this.qHeaders.baseDefine("Charset", val, BaseProperty.ATTRS_MASK_WED);
+									this.qHeaders.baseDefine("Content-Charset", val, BaseProperty.ATTRS_MASK_WED);
 								} else //
 								if (key.equals("_cd_")) {
 									this.qVerb = val;

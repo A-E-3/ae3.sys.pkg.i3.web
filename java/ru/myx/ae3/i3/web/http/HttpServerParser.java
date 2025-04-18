@@ -1,5 +1,6 @@
 package ru.myx.ae3.i3.web.http;
 
+import ru.myx.ae3.base.Base;
 import ru.myx.ae3.base.BaseFunction;
 import ru.myx.ae3.base.BaseObject;
 import ru.myx.ae3.binary.TransferSocket;
@@ -34,7 +35,12 @@ public class HttpServerParser {
 		final boolean reverseProxied = Convert.MapEntry.toBoolean(attributes, "reverseProxied", false);
 		final int ifModifiedSinceMode = Convert.MapEntry.toInt(attributes, "ifModifiedSince", FlowConfiguration.STRS_IMS, 1);
 		final FlowConfiguration configuration = new FlowConfiguration(
-				HttpProtocol.PNAME_HTTP,
+				Base.getString(
+						attributes,
+						"factory",
+						https
+							? HttpProtocol.PNAME_HTTPS
+							: HttpProtocol.PNAME_HTTP),
 				ignoreTargetPort,
 				ignoreGzip,
 				ignoreKeepAlive,
