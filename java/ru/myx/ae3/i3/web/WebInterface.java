@@ -524,7 +524,7 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 	@Override
 	public void close() {
 
-		WebInterface.LOG.event("WEB-IFACE", "CLOSED", "Web Interface Handler is closed.");
+		WebInterface.LOG.event("WEB-IFACE", "CLOSED", "Web Interface RequestHandler is closed.");
 	}
 
 	/** @return */
