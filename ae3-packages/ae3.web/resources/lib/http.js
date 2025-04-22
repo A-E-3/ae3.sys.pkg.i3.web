@@ -269,6 +269,18 @@ function internRequestCallbackMessage(parameters, hostname, port, https, socket)
 	headers["Host"] = parameters.host || (hostname + ":" + port);
 	headers["Connection"] = "close";
 
+	/** <code>
+	const outputCollector = Transfer.createCollector();
+	outputCollector.printFormatUtf8("%s %s%s%s %s\r\n", //
+		method,
+		path[0] === "/" ? " " : " /",
+		path ?? "",
+		parameters.search ?? "",
+		parameters.protocolVariant || "HTTP/1.1"
+	);
+	...
+
+	 * </code> */
 	// TODO: get TransferSocket. Send bytes; Or make $output work with TransferSocket as an argument
 	var output = "", key;
 	$output(output){
