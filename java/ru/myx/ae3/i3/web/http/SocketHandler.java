@@ -67,197 +67,197 @@ import ru.myx.util.WeakFinalizer;
  *         http://cloud.datashed.net/gems/starlady/TrillianPro.zip */
 
 final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boolean>, SerializationRequest, TransferBuffer {
-	
+
 	private static final String A_SERVER = "AE3 " + Engine.VERSION_STRING + " HTTP Interface, Pure JAVA";
-	
+
 	private static final String A_SERVER_SERIALIZATION = "AE3 " + Engine.VERSION_STRING + " HTTP Interface, Pure JAVA (serialization)";
-	
+
 	static int stRequests = 0;
-	
+
 	static int stRequestsHttp = 0;
-	
+
 	static int stRequestsHttps = 0;
-	
+
 	static int stBadRequests = 0;
-	
+
 	static int stGzipped = 0;
-	
+
 	static int stChunked = 0;
-	
+
 	static int stHttp10 = 0;
-	
+
 	static int stHttp11 = 0;
-	
+
 	static int stUnexpectedFinalizations = 0;
-	
+
 	static final int RBUFF_INIT = Engine.MODE_SPEED
 		? 16384
 		: 4096;
-	
+
 	static final int RBUFF_RSET = Engine.MODE_SIZE
 		? 4096
 		: 32768;
-	
+
 	static final int QBUFF_INIT = Engine.MODE_SPEED
 		? 16384
 		: 4096;
-	
+
 	static final int QBUFF_STEP = Engine.MODE_SIZE
 		? 2048
 		: 4096;
-	
+
 	static final int QBUFF_RSET = Engine.MODE_SIZE
 		? 4096
 		: 32768;
-	
+
 	private static final byte[] BYTES_UNKNOWN_TITLE_PREFFIX = " ".getBytes();
-	
+
 	private static final byte[] BYTES_UNKNOWN_TITLE_SUFFIX = ("\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	/** private static final byte[] BYTES_UNKNOWN_TITLE_SUFFIX = ("]\r\nServer: " +
 	 * SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n") .getBytes(); */
-	
+
 	private static final String UNKNOWN_TYPE = "application/octet-stream";
-	
+
 	private static final byte[] DIGIT_ONES = {
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2',
 			'3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5',
 			'6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '1', '2', '3', '4', '5', '6', '7', '8',
 			'9',
 	};
-	
+
 	private static final byte[] DIGIT_TENS = {
 			'0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '1', '1', '1', '1', '1', '1', '1', '1', '1', '1', '2', '2', '2', '2', '2', '2', '2', '2', '2', '2', '3', '3', '3',
 			'3', '3', '3', '3', '3', '3', '3', '4', '4', '4', '4', '4', '4', '4', '4', '4', '4', '5', '5', '5', '5', '5', '5', '5', '5', '5', '5', '6', '6', '6', '6', '6', '6',
 			'6', '6', '6', '6', '7', '7', '7', '7', '7', '7', '7', '7', '7', '7', '8', '8', '8', '8', '8', '8', '8', '8', '8', '8', '9', '9', '9', '9', '9', '9', '9', '9', '9',
 			'9',
 	};
-	
+
 	private static final byte[] DIGITS = {
 			'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
 			'x', 'y', 'z'
 	};
-	
+
 	private static final byte[] HD_UNAUTHORIZED = (Reply.CD_UNAUTHORIZED + " User Authentication Required\r\nWWW-Authenticate: Basic realm=\"sign in\"\r\nServer: "
 			+ SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_BADMETHOD = (Reply.CD_BADMETHOD + " Bad method\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\n")
 			.getBytes();
-	
+
 	private static final byte[] HD_BADRANGE = (Reply.CD_BADRANGE + " Bad range\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\n")
 			.getBytes();
-	
+
 	private static final byte[] HD_BADQUERY = (Reply.CD_BADQUERY + " Bad query\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_BUSY = (Reply.CD_BUSY + " Busy\r\nRetry-After: 60\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_CONFLICT = (Reply.CD_CONFLICT + " Conflict\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_CREATED = (Reply.CD_CREATED + " Created\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_DENIED = (Reply.CD_DENIED + " Forbidden\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_EXCEPTION = (Reply.CD_EXCEPTION + " Server error\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_FAILED = (Reply.CD_FAILED_PRECONDITION + " Failed\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_LOCKED = (Reply.CD_LOCKED + " Locked\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_LOOKAT = (Reply.CD_LOOKAT + " Found (Redirection)\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_MODIFIED = (Reply.CD_FAILED_PRECONDITION + " Modified\r\nServer: " + SocketHandler.A_SERVER
 			+ "\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\n").getBytes();
-	
+
 	private static final byte[] HD_MOVED = (Reply.CD_MOVED + " Moved\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_MULTISTATUS = (Reply.CD_MULTISTATUS + " Multistatus\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_NOTFOUND = (Reply.CD_UNKNOWN + " Not found\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_OK = (Reply.CD_OK + " OK\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_OK_DYNAMIC = (Reply.CD_OK + " OK (dynamic)\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_OK_EMPTY = (Reply.CD_EMPTY + " Empty\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\n").getBytes();
-	
+
 	private static final byte[] HD_OK_EMPTY_WITH_BODY = (Reply.CD_OK + " Empty document follows\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_OK_MODIFIED = (Reply.CD_OK + " OK (modified)\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_PARTIAL = (Reply.CD_PARTIAL + " Partial\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_UNIMPLEMENTED = (Reply.CD_UNIMPLEMENTED + " Unimplemented\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HD_UNMODIFIED = (Reply.CD_UNMODIFIED + " Not modified\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\nContent-Length: 0\r\n")
 			.getBytes();
-	
+
 	private static final byte[] HD_UNSUPPORTED = (Reply.CD_UNSUPPORTED_FORMAT + " Unsupported\r\nServer: " + SocketHandler.A_SERVER + "\r\nAccept-Ranges: bytes\r\n").getBytes();
-	
+
 	private static final byte[] HEADER_TE_CHUNKED_ALIVE = "Transfer-Encoding: chunked\r\nConnection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_TE_CHUNKED_CLOSE = "Transfer-Encoding: chunked\r\nConnection: close\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_TE_GZIP_CHUNKED_ALIVE = "Transfer-Encoding: gzip, chunked\r\nConnection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_TE_GZIP_CHUNKED_CLOSE = "Transfer-Encoding: gzip, chunked\r\nConnection: close\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_CE_GZIP_CHUNKED_ALIVE = "Content-Encoding: gzip\r\nTransfer-Encoding: chunked\r\nConnection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n"
 			.getBytes();
-	
+
 	private static final byte[] HEADER_CE_GZIP_CHUNKED_CLOSE = "Content-Encoding: gzip\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_TE_GZIP_ALIVE = "Transfer-Encoding: gzip\r\nConnection: close\r\nConnection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_CE_GZIP_ALIVE = "Content-Encoding: gzip\r\nConnection: close\r\nConnection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_CE_GZIP_CLOSE = "Content-Encoding: gzip\r\nConnection: close\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_TE_GZIP_CLOSE = "Transfer-Encoding: gzip\r\nConnection: close\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_CN_IDENTITY_ALIVE = "Connection: Keep-Alive\r\nKeep-Alive: max=256, timeout=60\r\n".getBytes();
-	
+
 	private static final byte[] HEADER_CN_IDENTITY_CLOSE = "Connection: close\r\n".getBytes();
-	
+
 	private static final KeepAliveReadConnector KEEP_ALIVE_CONNECTOR = new KeepAliveReadConnector();
-	
+
 	private static final int MAX_CHUNK_HEADER_SIZE = 128;
-	
+
 	private static final int MAX_CHUNK_SIZE = 32768;
-	
+
 	private static final int MAX_COMMAND_LENGTH = 128;
-	
+
 	private static final int MAX_HEADER_LENGTH = 256;
-	
+
 	private static final int MAX_HEADERS = 96;
-	
+
 	private static final int MAX_PATH_LENGTH = 2048;
-	
+
 	private static final int MAX_PROTOCOL_LENGTH = 64;
-	
+
 	private static final int MAX_QUERY_LENGTH = 8192;
-	
+
 	private static final int MAX_VALUE_LENGTH = 3072;
-	
+
 	private static final int MD_CHUNKED_BLOCK = 8;
-	
+
 	private static final int MD_CHUNKED_HEADER = 7;
-	
+
 	private static final int MD_COMMAND = 2;
-	
+
 	private static final int MD_FIRSTBYTE = 9;
-	
+
 	private static final int MD_HEADER = 0;
-	
+
 	private static final int MD_LOAD_BODY = 6;
-	
+
 	private static final int MD_PATH = 3;
-	
+
 	private static final int MD_PROTOCOL = 5;
-	
+
 	private static final int MD_QUERY = 4;
-	
+
 	private static final int MD_VALUE = 1;
-	
+
 	private static final byte RU_00_RSET = 0b00000000; // fresh parser
 	private static final byte RU_01_QDRT = 0b00000001; // query read
 	private static final byte RU_02_RDRT = 0b00000010; // reply ready
@@ -265,21 +265,21 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 	private static final byte RU_08_OPEN = 0b00001000; // want close
 	private static final byte RU_10_INIT = 0b00010000; // in the reuse queue
 	private static final byte RU_20_UREF = 0b00100000; // not to be reused
-	
+
 	private static final byte[] MIN_INTEGER = "-2147483648".getBytes();
-	
+
 	private static final byte[] MIN_LONG = "-9223372036854775808".getBytes();
-	
+
 	private static final byte[] PREFFIX_HTTP10 = "HTTP/1.0 ".getBytes();
-	
+
 	private static final byte[] PREFFIX_HTTP11 = "HTTP/1.1 ".getBytes();
-	
+
 	private static final byte[] RESPONSE_100 = (//
 	"HTTP/1.1 100 CONTINUE\r\n" //
 			+ "Server: " + SocketHandler.A_SERVER + "\r\n" //
 			+ "Content-Length: 0\r\n"//
 			+ "\r\n").getBytes();
-	
+
 	private static final byte[] RESPONSE_400 = (//
 	"HTTP/1.1 400 BAD REQUEST\r\n"//
 			+ "Server: " + SocketHandler.A_SERVER + "\r\n"//
@@ -287,7 +287,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			+ "Content-Type: text/plain\r\n"//
 			+ "Content-Length: 0\r\n"//
 			+ "\r\n").getBytes();
-	
+
 	private static final byte[] RESPONSE_414 = (//
 	"HTTP/1.1 414 LONG URI\r\n"//
 			+ "Server: " + SocketHandler.A_SERVER + "\r\n"//
@@ -295,7 +295,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			+ "Content-Type: text/plain\r\n"//
 			+ "Content-Length: 0\r\n"//
 			+ "\r\n").getBytes();
-	
+
 	private static final byte[] RESPONSE_431 = (//
 	"HTTP/1.1 431 Request Header Fields Too Large\r\n"//
 			+ "Server: " + SocketHandler.A_SERVER + "\r\n"//
@@ -303,32 +303,32 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			+ "Content-Type: text/plain\r\n"//
 			+ "Content-Length: 0\r\n"//
 			+ "\r\n").getBytes();
-	
+
 	private static final int[] SIZE_TABLE = {
 			9, 99, 999, 9999, 99999, 999999, 9999999, 99999999, 999999999, Integer.MAX_VALUE
 	};
-	
+
 	static int stExpands = 0;
-	
+
 	private static final long UID_EXPIRATION = 60_000L * 60L * 24L * 365L * 5L;
-	
+
 	private static final int[] UPCASE_XLAT = SocketHandler.createUpperCaseXlatTable();
-	
+
 	static {
 		HttpProtocol.LOG.event("INFO", "#LEGEND#", "CODE\tPROTO\tCMD\tMEAN-ADDR(,PEER-ADDR)\t\tFLAGS\tTX\tSERVED\tSENT\tPEER-ID\tURL");
 	}
-	
+
 	private static final int[] createUpperCaseXlatTable() {
-		
+
 		final int[] result = new int[128];
 		for (int i = 127; i >= 0; --i) {
 			result[i] = Character.toUpperCase((char) i);
 		}
 		return result;
 	}
-	
+
 	private static final void finalizeStatic(final SocketHandler x) {
-		
+
 		if (x != null && x.socket != null) {
 			if (x.socket.isOpen()) {
 				try {
@@ -345,9 +345,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			x.socket = null;
 		}
 	}
-	
+
 	private static final String fixUrl(final ServeRequest query, final String original) {
-		
+
 		if (original.length() > 0 && original.charAt(0) == '/') {
 			// return query.getUrlBase() + original.substring(1);
 			return original;
@@ -361,9 +361,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 					: url.lastIndexOf('/', pos) + 1)
 				+ original;
 	}
-	
+
 	private static final boolean isValidLocalIp(final String ip) {
-		
+
 		final int len = ip.length();
 		IPv4 : {
 			if (len <= 6 || len >= 16) { // 1.3.5.7 255.255.255.255
@@ -402,9 +402,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return false;
 	}
-	
+
 	private static final boolean isValidNonLocalIp(final String ip) {
-		
+
 		final int len = ip.length();
 		IPv4 : {
 			if (len <= 6 || len >= 16) { // 1.3.5.7 255.255.255.255
@@ -443,20 +443,20 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return false;
 	}
-	
+
 	// Requires positive x
 	private static final int stringSizeOfInt(final int x) {
-		
+
 		for (int i = 0;; ++i) {
 			if (x <= SocketHandler.SIZE_TABLE[i]) {
 				return i + 1;
 			}
 		}
 	}
-	
+
 	// Requires positive x
 	private static final int stringSizeOfLong(final long x) {
-		
+
 		long p = 10;
 		for (int i = 1; i < 19; ++i) {
 			if (x < p) {
@@ -466,105 +466,105 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return 19;
 	}
-	
+
 	private TransferCollector collector;
-	
+
 	private FlowConfiguration configuration;
-	
+
 	private String qCurrentHeader;
-	
+
 	private final Date date;
-	
+
 	private final SimpleDateFormat dateFormatHeader;
-	
+
 	private final SimpleDateFormat dateFormatCookie;
-	
+
 	private String sourcePeerAddress;
-	
+
 	private String targetPeerAddress;
-	
+
 	private byte reuse;
-	
+
 	private byte[] rBuffer;
-	
+
 	private BaseMap qHeaders;
-	
+
 	private BaseObject qCookies;
-	
+
 	private int rBufferLength;
-	
+
 	private int rBufferPosition;
-	
+
 	private boolean http11;
-	
+
 	private boolean doChunked;
-	
+
 	private boolean doCompress;
-	
+
 	private boolean doKeepAlive;
-	
+
 	private boolean teGzip;
-	
+
 	private int qPoints;
-	
+
 	private String protocolName;
-	
+
 	private int qArgumentPosition;
-	
+
 	private List<String> qArguments;
-	
+
 	private char[] qBuffer;
-	
+
 	private int qBufferCapacity;
-	
+
 	private int qBufSize;
-	
+
 	private boolean qChunked;
-	
+
 	private String qVerb;
-	
+
 	private int qContentLength;
-	
+
 	private String qContentType;
-	
+
 	private int qHeadersSize;
-	
+
 	private String qHost;
-	
+
 	private int qLengthRemaining;
-	
+
 	private int qMode;
-	
+
 	private Charset qInputCharset;
-	
+
 	private BaseMap qParameters;
-	
+
 	private String qPath;
-	
+
 	private String qProtocol;
-	
+
 	private int qQueryPosition;
-	
+
 	private String qQueryString;
-	
+
 	private ServeRequest query;
-	
+
 	private final int queueIndex;
-	
+
 	private ReplyAnswer reply;
-	
+
 	private TransferSocket socket;
-	
+
 	private String sourceMeanAddress;
-	
+
 	private String sourcePeerIdentity;
-	
+
 	{
 		WeakFinalizer.register(this, SocketHandler::finalizeStatic);
 	}
-	
+
 	SocketHandler(final int queueIndex) {
-		
+
 		this.queueIndex = queueIndex;
 		this.dateFormatHeader = new SimpleDateFormat("E, dd MMM yyyy HH:mm:ss 'GMT'", Locale.ENGLISH);
 		this.dateFormatHeader.setTimeZone(Engine.TIMEZONE_GMT);
@@ -576,9 +576,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.qBufferCapacity = SocketHandler.QBUFF_INIT;
 		this.rBuffer = new byte[SocketHandler.RBUFF_INIT];
 	}
-	
+
 	private final void addHeader(final String key, final BaseObject value) {
-		
+
 		assert value != null : "NULL java value";
 		if (value.baseIsPrimitive()) {
 			if (value == BaseObject.UNDEFINED || value == BaseObject.NULL) {
@@ -630,9 +630,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.headAppend(value.toString());
 		this.headAppendCRLF();
 	}
-	
+
 	private final boolean append(final int b) {
-		
+
 		if (--this.qLengthRemaining <= 0) {
 			switch (this.qMode) {
 				case MD_HEADER :
@@ -658,9 +658,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.qBuffer[this.qBufSize++] = (char) b;
 		return true;
 	}
-	
+
 	private final ServeRequest createQueryHttp(final TransferCopier copier) {
-		
+
 		SocketHandler.stRequests++;
 		SocketHandler.stRequestsHttp++;
 		final String[] qArguments = this.qArguments == null
@@ -703,9 +703,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 					qArguments,
 					this.qParameters)).setResponseTarget(this);
 	}
-	
+
 	private final ServeRequest createQueryHttps(final TransferCopier copier) {
-		
+
 		SocketHandler.stRequests++;
 		SocketHandler.stRequestsHttps++;
 		final String[] qArguments = this.qArguments == null
@@ -748,9 +748,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 					qArguments,
 					this.qParameters)).setResponseTarget(this);
 	}
-	
+
 	private final void headAppend(final byte str[]) {
-		
+
 		final int newCount = this.rBufferLength + str.length;
 		if (newCount > this.rBuffer.length) {
 			this.headExpand(newCount);
@@ -758,9 +758,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		System.arraycopy(str, 0, this.rBuffer, this.rBufferLength, str.length);
 		this.rBufferLength = newCount;
 	}
-	
+
 	private final void headAppend(int i) {
-		
+
 		if (i == Integer.MIN_VALUE) {
 			this.headAppend(SocketHandler.MIN_INTEGER);
 			return;
@@ -804,9 +804,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		this.rBufferLength = spaceNeeded;
 	}
-	
+
 	private final void headAppend(final String str) {
-		
+
 		if (str == null) {
 			this.headAppend("null");
 			return;
@@ -827,9 +827,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.headAppend(str.getBytes());
 		}
 	}
-	
+
 	private final void headAppendCRLF() {
-		
+
 		final int newCount = this.rBufferLength + 2;
 		if (newCount > this.rBuffer.length) {
 			this.headExpand(newCount);
@@ -837,9 +837,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.rBuffer[this.rBufferLength++] = '\r';
 		this.rBuffer[this.rBufferLength++] = '\n';
 	}
-	
+
 	private final void headAppendHDDIV() {
-		
+
 		final int newCount = this.rBufferLength + 2;
 		if (newCount > this.rBuffer.length) {
 			this.headExpand(newCount);
@@ -847,9 +847,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.rBuffer[this.rBufferLength++] = ':';
 		this.rBuffer[this.rBufferLength++] = ' ';
 	}
-	
+
 	private final void headExpand(final int minimumCapacity) {
-		
+
 		int newCapacity = (this.rBuffer.length + 1) * 2;
 		if (newCapacity < 0) {
 			newCapacity = Integer.MAX_VALUE;
@@ -861,14 +861,14 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		System.arraycopy(this.rBuffer, 0, newValue, 0, this.rBufferLength);
 		this.rBuffer = newValue;
 	}
-	
+
 	private final boolean onDoneRead(final TransferCopier copier) {
-		
+
 		final TransferSocket socket = this.socket;
 		if (socket != null) {
 			socket.getSource().connectTarget(null);
 		}
-		
+
 		/** Host header is required for HTTP/1.1 **/
 		if (this.http11 && this.qHost == null) {
 			HttpProtocol.LOG.event(
@@ -877,13 +877,13 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 					"BAD REQUEST: no host header with HTTP/1.1 protocol version, verb=" + this.qVerb + ", path=" + this.qPath + ", remote=" + this.sourcePeerIdentity);
 			return this.onError4xxBadRequest(SocketHandler.RESPONSE_400);
 		}
-		
+
 		/** Creating Query object **/
 		final ServeRequest query = this.query = this.protocolName == HttpProtocol.PNAME_HTTP //
 				&& !(this.configuration.reverseProxied && Base.getString(this.qHeaders, "Secure", "false").equals("true"))
 					? this.createQueryHttp(copier)
 					: this.createQueryHttps(copier);
-		
+
 		try {
 			if (!this.configuration.target.absorb(query)) {
 				if (Report.MODE_DEBUG) {
@@ -904,10 +904,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.reuse &= ~SocketHandler.RU_01_QDRT;
 		}
 	}
-	
+
 	/** always returns false */
 	private final boolean onError4xxBadRequest(final byte[] fullResponse) {
-		
+
 		if (this.socket == null) {
 			return false;
 		}
@@ -926,9 +926,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.close();
 		return false;
 	}
-	
+
 	private final void onHeader(final String header, final String value) {
-		
+
 		final String hdr = header.toLowerCase();
 		final int length = hdr.length();
 		switch (hdr.charAt(0)) {
@@ -1065,9 +1065,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				BaseProperty.ATTRS_MASK_WED);
 		this.qHeadersSize++;
 	}
-	
+
 	private final long render(final ReplyAnswer reply) throws IOException {
-		
+
 		if (reply.isEmpty()) {
 			reply.setAttribute("Content-Length", "0");
 			this.startRender(reply);
@@ -1263,9 +1263,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			? message.length
 			: 0;
 	}
-	
+
 	private final long renderBuffer(final ReplyAnswer reply, final TransferBuffer bufferOriginal) throws IOException {
-		
+
 		final TransferBuffer buffer;
 		if (bufferOriginal == null) {
 			buffer = TransferBuffer.NUL_BUFFER;
@@ -1397,9 +1397,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return bodySize;
 	}
-	
+
 	private final void resetQueryParser() {
-		
+
 		this.qQueryString = null;
 		this.qHost = null;
 		this.qContentType = null;
@@ -1410,9 +1410,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.qBuffer = new char[this.qBufferCapacity = SocketHandler.QBUFF_INIT];
 		}
 	}
-	
+
 	private final void resetResponseBuilder() {
-		
+
 		this.qPath = null;
 		this.qVerb = null;
 		this.qHeaders = null;
@@ -1428,9 +1428,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.sourcePeerIdentity = null;
 		this.reply = null;
 	}
-	
+
 	private final String setMode(final int mode, final int maxLength) {
-		
+
 		try {
 			return new String(this.qBuffer, 0, this.qBufSize);
 		} finally {
@@ -1439,10 +1439,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.qLengthRemaining = maxLength;
 		}
 	}
-	
+
 	/** returns: true if content should follow */
 	private final boolean startRender(final ReplyAnswer reply) throws java.io.IOException {
-		
+
 		final ServeRequest query = this.query;
 		final BaseObject attributes = reply.getAttributes();
 		boolean suppressContentLength = false;
@@ -1744,7 +1744,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			if (rUserID != null && (qUserID == null || !rUserID.equals(qUserID))) {
 				this.headAppend("Set-Cookie: UID-s=");
 				this.headAppend(rUserID);
-				
+
 				/** FIXME mmsource */
 				if (false) {
 					this.headAppend("; path=/\r\n");
@@ -1775,7 +1775,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				}
 			}
 		}
-		
+
 		if (delayResponse) {
 			this.socket.setTransferDescription(TransferDescription.IDLE_UNLIMITED);
 			this.doCompress = false;
@@ -1815,11 +1815,11 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				}
 			}
 		}
-		
+
 		final long contentLength = Base.getLong(attributes, "Content-Length", -1);
-		
+
 		bodylessResponse = bodylessResponse || contentLength == 0 || code == Reply.CD_EMPTY || code / 100 == ReplyAnswer.TP_RD || query.getVerbOriginal().equals("HEAD");
-		
+
 		if (bodylessResponse) {
 			if (this.doCompress) {
 				this.doCompress = false;
@@ -1847,7 +1847,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.doKeepAlive = this.doKeepAlive && contentLength > 0;
 			this.doChunked = false;
 		}
-		
+
 		this.headAppend(
 				this.doCompress
 					? this.doChunked
@@ -1884,7 +1884,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 							? SocketHandler.HEADER_CN_IDENTITY_ALIVE
 							// PL RW CL
 							: SocketHandler.HEADER_CN_IDENTITY_CLOSE);
-		
+
 		if (Report.MODE_DEBUG || Report.MODE_ASSERT) {
 			reply.addAttribute("X-Debug-Origin", reply.getEventTypeId());
 		}
@@ -1955,10 +1955,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.reuse |= SocketHandler.RU_04_BDRT;
 		return !bodylessResponse;
 	}
-	
+
 	@Override
 	public final void abort(final String reason) {
-		
+
 		final TransferSocket socket = this.socket;
 		if (socket != null) {
 			this.socket = null;
@@ -1981,12 +1981,12 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				this.reuse = SocketHandler.RU_10_INIT;
 				HandlerQueue.reuseParser(this, this.queueIndex);
 				return;
-			
+
 			case RU_10_INIT :
 				// throw new IllegalStateException("Parser state is INIT, parser: " + this);
 				HandlerQueue.reuseParser(this, this.queueIndex);
 				return;
-			
+
 			default :
 				if ((this.reuse & SocketHandler.RU_08_OPEN) != 0) {
 					this.reuse &= ~SocketHandler.RU_08_OPEN;
@@ -1994,7 +1994,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				return;
 		}
 	}
-	
+
 	// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2010,7 +2010,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 	// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	@Override
 	public final boolean absorb(final int i) {
-		
+
 		switch (this.qMode) {
 			case MD_HEADER :
 				if (i == '\r') {
@@ -2276,10 +2276,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				return false;
 		}
 	}
-	
+
 	@Override
 	public final boolean absorbArray(final byte[] bytes, final int off, final int length) {
-		
+
 		if (this.qMode == SocketHandler.MD_LOAD_BODY && this.qLengthRemaining >= length) {
 			this.qLengthRemaining -= length;
 			this.collector.getTarget().absorbArray(bytes, off, length);
@@ -2303,10 +2303,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return true;
 	}
-	
+
 	@Override
 	public final boolean absorbBuffer(final TransferBuffer buffer) {
-		
+
 		if (buffer.isDirectAbsolutely()) {
 			final byte[] bytes = buffer.toDirectArray();
 			return this.absorbArray(bytes, 0, bytes.length);
@@ -2347,10 +2347,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return true;
 	}
-	
+
 	@Override
 	public final boolean absorbNio(final ByteBuffer buffer) {
-		
+
 		for (;;) {
 			final int remaining = buffer.remaining();
 			if (remaining == 0) {
@@ -2401,17 +2401,17 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			}
 		}
 	}
-	
+
 	@Override
 	public final Boolean apply(final ReplyAnswer reply) {
-		
+
 		final int responseCode = reply.getCode();
 		if (responseCode == Reply.CD_PROCESSING) {
 			/** parser is still to be reused! */
 			return Boolean.TRUE;
 		}
 		if (responseCode == Reply.CD_RAW_PROTOCOL) {
-			
+
 			final TransferSocket proxy;
 			proxy : {
 				final Object object = reply.getObject();
@@ -2440,10 +2440,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			}
 			final TransferSocket socket = this.socket;
 			this.socket = null;
-			
+
 			proxy.getSource().connectTarget(socket.getTarget());
 			socket.getSource().connectTarget(proxy.getTarget());
-			
+
 			final ServeRequest query = this.query;
 			final String sourceAddress = query.getSourceAddress();
 			final String sourceAddressExact = query.getSourceAddressExact();
@@ -2465,7 +2465,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.close();
 			return Boolean.TRUE;
 		}
-		
+
 		this.reuse |= SocketHandler.RU_02_RDRT;
 		this.rBufferLength = 0;
 		this.rBufferPosition = 0;
@@ -2505,10 +2505,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return this.executeDone(written);
 	}
-	
+
 	@Override
 	public final void close() {
-		
+
 		final TransferSocket socket = this.socket;
 		if (socket != null) {
 			this.socket = null;
@@ -2531,10 +2531,12 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				this.reuse = SocketHandler.RU_10_INIT;
 				HandlerQueue.reuseParser(this, this.queueIndex);
 				return;
-			
+
 			case RU_10_INIT :
-				throw new IllegalStateException("Parser state is INIT, parser: " + this);
-			
+				// throw new IllegalStateException("Parser state is INIT, parser: " + this);
+				HandlerQueue.reuseParser(this, this.queueIndex);
+				return;
+
 			default :
 				if ((this.reuse & SocketHandler.RU_08_OPEN) != 0) {
 					this.reuse &= ~SocketHandler.RU_08_OPEN;
@@ -2542,10 +2544,10 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				return;
 		}
 	}
-	
+
 	@Override
 	public final void destroy() {
-		
+
 		switch (this.reuse) {
 			case RU_04_BDRT :
 				if (this.rBuffer.length > SocketHandler.RBUFF_RSET) {
@@ -2554,10 +2556,12 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				this.reuse = SocketHandler.RU_10_INIT;
 				HandlerQueue.reuseParser(this, this.queueIndex);
 				return;
-			
+
 			case RU_10_INIT :
-				throw new IllegalStateException("Parser state is INIT, parser: " + this);
-			
+				// throw new IllegalStateException("Parser state is INIT, parser: " + this);
+				HandlerQueue.reuseParser(this, this.queueIndex);
+				return;
+
 			default :
 				if ((this.reuse & SocketHandler.RU_04_BDRT) != 0) {
 					this.reuse ^= SocketHandler.RU_04_BDRT;
@@ -2565,73 +2569,73 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 				return;
 		}
 	}
-	
+
 	@Override
 	public <A, R> boolean enqueueAction(final ExecProcess ctx, final Function<A, R> function, final A argument) {
-		
+
 		Act.launch(ctx, function, argument);
 		return true;
 	}
-	
+
 	@Override
 	public final void force() {
-		
+
 		// ignore
 	}
-	
+
 	@Override
 	public final String[] getAcceptTypes() {
-		
+
 		return null;
 	}
-	
+
 	@Override
 	public MessageDigest getMessageDigest() {
-		
+
 		final MessageDigest digest = Engine.getMessageDigestInstance();
 		digest.update(this.rBuffer, this.rBufferPosition, this.rBufferLength);
 		return digest;
 	}
-	
+
 	@Override
 	public final Object getObject() {
-		
+
 		return this.reply.getObject();
 	}
-	
+
 	@Override
 	public final Class<?> getObjectClass() {
-		
+
 		return this.reply.getObjectClass();
 	}
-	
+
 	@Override
 	public final boolean hasRemaining() {
-		
+
 		return this.rBufferLength - this.rBufferPosition > 0;
 	}
-	
+
 	@Override
 	public final boolean isDirectAbsolutely() {
-		
+
 		return this.rBufferPosition == 0 && this.rBufferLength == this.rBuffer.length;
 	}
-	
+
 	@Override
 	public final boolean isSequence() {
-		
+
 		return false;
 	}
-	
+
 	@Override
 	public final int next() {
-		
+
 		return this.rBuffer[this.rBufferPosition++] & 0xFF;
 	}
-	
+
 	@Override
 	public final int next(final byte[] buffer, final int offset, final int length) {
-		
+
 		final int amount = Math.min(this.rBufferLength - this.rBufferPosition, length);
 		if (amount > 0) {
 			System.arraycopy(this.rBuffer, this.rBufferPosition, buffer, offset, amount);
@@ -2639,22 +2643,22 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return amount;
 	}
-	
+
 	@Override
 	public final TransferBuffer nextSequenceBuffer() {
-		
+
 		throw new UnsupportedOperationException("Not a sequence!");
 	}
-	
+
 	@Override
 	public final long remaining() {
-		
+
 		return this.rBufferLength - this.rBufferPosition;
 	}
-	
+
 	@Override
 	public final TransferCollector setResultType(final String contentType) throws IOException {
-		
+
 		assert contentType != null : "NULL contentType";
 		assert contentType.indexOf('/') != -1 : "Invalid content type: " + contentType;
 		this.reply.setAttribute("Server", SocketHandler.A_SERVER_SERIALIZATION);
@@ -2672,28 +2676,28 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		return this.collector;
 	}
-	
+
 	@Override
 	public final TransferCopier toBinary() {
-		
+
 		final int position = this.rBufferPosition;
 		final int remaining = this.rBufferLength - position;
-		
+
 		if ((this.reuse & SocketHandler.RU_20_UREF) != 0) {
 			/** Wrap is used cause it supposed to be called internally and sequentially */
 			return Transfer.wrapCopier(this.rBuffer, position, remaining);
 		}
-		
+
 		try {
 			return Transfer.createCopier(this.rBuffer, position, remaining);
 		} finally {
 			this.destroy();
 		}
 	}
-	
+
 	@Override
 	public final byte[] toDirectArray() {
-		
+
 		if (this.rBufferPosition == 0 && this.rBufferLength == this.rBuffer.length) {
 			this.rBufferPosition = this.rBufferLength;
 			/** FIXME: reallocate buffer? **/
@@ -2707,16 +2711,16 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.destroy();
 		return result;
 	}
-	
+
 	@Override
 	public final DataInputByteArrayFast toInputStream() {
-		
+
 		return new DataInputByteArrayFast(this.toDirectArray());
 	}
-	
+
 	@Override
 	public final TransferBuffer toNioBuffer(final ByteBuffer target) {
-		
+
 		final int remaining = this.rBufferLength - this.rBufferPosition;
 		if (remaining <= 0) {
 			this.destroy();
@@ -2736,42 +2740,42 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.rBufferPosition += writable;
 		return this;
 	}
-	
+
 	@Override
 	public final InputStreamReader toReaderUtf8() {
-		
+
 		return new InputStreamReader(this.toInputStream(), StandardCharsets.UTF_8);
 	}
-	
+
 	@Override
 	public final String toString() {
-		
+
 		return "[HttpServerParser(" + System.identityHashCode(this) + ", bufRemaining=" + this.remaining() + ")]";
 	}
-	
+
 	@Override
 	public final String toString(final Charset charset) {
-		
+
 		final int remaining = this.rBufferLength - this.rBufferPosition;
 		if (remaining > 0) {
 			return new String(this.rBuffer, this.rBufferPosition, remaining, charset);
 		}
 		return "";
 	}
-	
+
 	@Override
 	public final String toString(final String charset) throws UnsupportedEncodingException {
-		
+
 		final int remaining = this.rBufferLength - this.rBufferPosition;
 		if (remaining > 0) {
 			return new String(this.rBuffer, this.rBufferPosition, remaining, charset);
 		}
 		return "";
 	}
-	
+
 	@Override
 	public final TransferBuffer toSubBuffer(final long start, final long end) {
-		
+
 		final int remaining = this.rBufferLength - this.rBufferPosition;
 		if (start < 0 || start > end || end > remaining) {
 			throw new IllegalArgumentException("Indexes are out of bounds: start=" + start + ", end=" + end + ", length=" + remaining);
@@ -2780,19 +2784,19 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.rBufferPosition += start;
 		return this;
 	}
-	
+
 	@Override
 	public MessageDigest updateMessageDigest(final MessageDigest digest) {
-		
+
 		digest.update(this.rBuffer, this.rBufferPosition, this.rBufferLength);
 		return digest;
 	}
-	
+
 	/** returns TRUE when connection should be kept for new replies<br/>
 	 * returns FALSE when connection is not to be held */
 	@SuppressWarnings("resource")
 	final Boolean executeDone(final long written) {
-		
+
 		final ServeRequest query = this.query;
 		final long length = written + this.rBufferLength;
 		final String logLine;
@@ -2823,7 +2827,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 					+ '\t' + query.getUrl()//
 			;
 		}
-		
+
 		try {
 			final Object execute = Base.getJava(this.qHeaders, "execute", null);
 			final TransferSocket socket = this.socket;
@@ -2875,9 +2879,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			this.resetResponseBuilder();
 		}
 	}
-	
+
 	final void headAppend(long l) {
-		
+
 		if (l == Long.MIN_VALUE) {
 			this.headAppend(SocketHandler.MIN_LONG);
 			return;
@@ -2931,9 +2935,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		}
 		this.rBufferLength = spaceNeeded;
 	}
-	
+
 	final boolean isSocketPresentAndOpen() {
-		
+
 		final TransferSocket socket = this.socket;
 		if (socket == null) {
 			return false;
@@ -2945,9 +2949,9 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		socket.abort("Underlying Socket is Closed");
 		return false;
 	}
-	
+
 	final void prepare(final TransferSocket socket, final FlowConfiguration configuration) {
-		
+
 		this.socket = socket;
 		this.configuration = configuration;
 		this.sourcePeerIdentity = socket.getIdentity();
@@ -2968,14 +2972,14 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 		this.qContentLength = -1;
 		this.qChunked = false;
 	}
-	
+
 	final TransferCollector prepareCollector() {
-		
+
 		if (this.collector == null) {
 			return this.collector = Transfer.createCollector();
 		}
 		this.collector.reset();
 		return this.collector;
 	}
-	
+
 }
