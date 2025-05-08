@@ -11,7 +11,7 @@ import ru.myx.ae3.base.BaseMap;
 import ru.myx.ae3.base.BaseObject;
 import ru.myx.ae3.binary.TransferCopier;
 import ru.myx.ae3.common.Value;
-import ru.myx.ae3.flow.Flow;
+import ru.myx.ae3.flow.FlowOperationException;
 import ru.myx.ae3.reflect.ReflectionIgnore;
 import ru.myx.ae3.serve.BinaryServeRequest;
 import ru.myx.ae3.serve.Request;
@@ -110,7 +110,7 @@ final class QueryHttpBinary extends QueryHttp<QueryHttpBinary> implements Binary
 		try {
 			return Request.characterWrapBinary(this);
 		} catch (final UnsupportedEncodingException e) {
-			throw new Flow.FlowOperationException("Error converting from binary to character", e);
+			throw new FlowOperationException("Error converting from binary to character", e);
 		}
 	}
 }
