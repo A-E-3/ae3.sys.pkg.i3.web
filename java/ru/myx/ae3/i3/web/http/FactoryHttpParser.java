@@ -35,7 +35,7 @@ public final class FactoryHttpParser implements ObjectFactory<TransferSocket, Ba
 	}
 
 	@Override
-	public final ObjectTarget<TransferSocket> connect(final String variant, final BaseObject attributes, final Class<?> source, final ObjectTarget<BaseMessage> target) {
+	public final ObjectTarget<TransferSocket> wrapTarget(final String variant, final BaseObject attributes, final Class<?> source, final ObjectTarget<BaseMessage> target) {
 
 		final boolean ignoreTargetPort = Convert.MapEntry.toBoolean(attributes, "ignoreTargetPort", false);
 		final boolean ignoreGzip = Convert.MapEntry.toBoolean(attributes, "ignoreGzip", false);
@@ -46,7 +46,7 @@ public final class FactoryHttpParser implements ObjectFactory<TransferSocket, Ba
 	}
 
 	@Override
-	public final ObjectSource<BaseMessage> prepare(final String variant, final BaseObject attributes, final TransferSocket socket) {
+	public final ObjectSource<BaseMessage> wrapSource(final String variant, final BaseObject attributes, final TransferSocket socket) {
 
 		final SourceBuffered buffer = new SourceBuffered(false);
 		final boolean ignoreTargetPort = Convert.MapEntry.toBoolean(attributes, "ignoreTargetPort", false);

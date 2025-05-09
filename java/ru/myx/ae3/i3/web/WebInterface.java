@@ -36,64 +36,80 @@ import ru.myx.ae3.vfs.TreeLinkType;
  *         TODO: ObjectTarget interface is not really used? */
 @ReflectionManual
 public class WebInterface implements ObjectTarget<ServeRequest> {
-
+	
 	static final ExecProcess CTX = Exec.createProcess(Exec.getRootProcess(), "Web Interface");
-
+	
 	static final ReportReceiver LOG = Report.createReceiver("ae3.i3.web");
-
+	
 	private static final ReferenceQueue<WebTarget> queue = new ReferenceQueue<>();
-
+	
 	private static final Map<String, RuntimeTarget> cache = new HashMap<>();
-
+	
 	private static final Map<String, BaseObject> LOCAL_NAMES = new ConcurrentHashMap<>();
-
+	
 	/**
 	 *
 	 */
 	@ReflectionExplicit
 	public static final EntryContainer WEB_SITES;
-
+	
 	/**
 	 *
 	 */
 	@ReflectionExplicit
 	public static final WebTarget TARGET_UNKNOWN;
-
+	
 	private static boolean started = false;
-
+	
 	private static boolean stopped = false;
-
+	
 	private static final Object LOCK = new Object();
-
+	
 	private static boolean running = false;
-
+	
 	static {
 		WEB_SITES = Storage.PROTECTED.relative("web", TreeLinkType.PUBLIC_TREE_REFERENCE).toContainer();
-
+		
 		TARGET_UNKNOWN = WebTargetUnknown.INSTANCE;
-
+		
 		WebInterface.localNameUpsert(Engine.HOST_NAME, BaseObject.createObject(null));
 		WebInterface.localNameUpsert("localhost", BaseObject.createObject(null));
 	}
-
+	
+	private static final void localNameInvalidate(final String name) {
+		
+		final int length = name.length();
+		synchronized (WebInterface.cache) {
+			for (final RuntimeTarget target : WebInterface.cache.values()) {
+				final String tname = target.name;
+				if (tname.endsWith(name)) {
+					final int tlength = tname.length();
+					if (tlength == length || tname.charAt(tlength - length - 1) == '.') {
+						target.reference.clear();
+					}
+				}
+			}
+		}
+	}
+	
 	/** May have some deferred/parallel tasks, return early
 	 *
 	 * @param query
 	 * @return true */
 	@ReflectionExplicit
 	public final static boolean dispatch(final ServeRequest query) {
-
+		
 		if (Report.MODE_DEVEL) {
 			WebInterface.LOG.event("WEB-IFACE", "QUERY-DISPATCH", String.valueOf(query));
 		}
-
+		
 		final WebTarget webTarget = WebInterface.dispatcherForQuery(query);
 		(webTarget == null
 			? WebTargetUnknown.INSTANCE
 			: webTarget).onDispatch(query);
 		return true;
 	}
-
+	
 	/** Happens inline (not in parallel), return when ready, doesn't handle 404 - returns null
 	 * instead.
 	 *
@@ -101,7 +117,7 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 	 * @return */
 	@ReflectionExplicit
 	public final static WebTarget dispatcherForQuery(final ServeRequest query) {
-
+		
 		/** We require client to support 'host' query header. It must be explicitly specified even
 		 * when accessing using IP address as host name. */
 		final String target = query.getTarget();
@@ -121,15 +137,15 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 		if (Report.MODE_DEBUG) {
 			WebInterface.LOG.event("WEB-IFACE", "QUERY", Format.Describe.toEcmaSource(query, ""));
 		}
-
+		
 		return WebInterface.dispatcherForTarget(target);
 	}
-
+	
 	/** @param target
 	 * @return */
 	@ReflectionExplicit
 	public final static WebTarget dispatcherForTarget(final String target) {
-
+		
 		{
 			/** immediate */
 			final RuntimeTarget runtimeTarget = WebInterface.cache.get(target);
@@ -164,12 +180,12 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 			}
 		}
 	}
-
+	
 	/** @param name
 	 * @return */
 	@ReflectionExplicit
 	public static String localNameCheck(final String name) {
-
+		
 		String check = name;
 		int pos = -1;
 		for (;;) {
@@ -185,29 +201,13 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 			check = name.substring(pos + 1);
 		}
 	}
-
-	private static final void localNameInvalidate(final String name) {
-
-		final int length = name.length();
-		synchronized (WebInterface.cache) {
-			for (final RuntimeTarget target : WebInterface.cache.values()) {
-				final String tname = target.name;
-				if (tname.endsWith(name)) {
-					final int tlength = tname.length();
-					if (tlength == length || tname.charAt(tlength - length - 1) == '.') {
-						target.reference.clear();
-					}
-				}
-			}
-		}
-	}
-
+	
 	/** @param name
 	 * @param key
 	 * @return */
 	@ReflectionExplicit
 	public static boolean localNameRemove(final String name, final BaseObject key) {
-
+		
 		WebInterface.LOG.event("WEB-IFACE", "LNAME", "localNameRemove: " + name);
 		synchronized (WebInterface.LOCAL_NAMES) {
 			final BaseObject current = WebInterface.LOCAL_NAMES.get(name);
@@ -219,18 +219,18 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 		WebInterface.localNameInvalidate(name);
 		return true;
 	}
-
+	
 	/** @param name
 	 * @param key
 	 * @return */
 	@ReflectionExplicit
 	public static boolean localNameUpsert(final String name, final BaseObject key) {
-
+		
 		if ("local".equals(name)) {
 			WebInterface.LOG.event("WEB-IFACE", "LNAME", "localNameUpsert 'local' name is ignored");
 			return false;
 		}
-
+		
 		WebInterface.LOG.event("WEB-IFACE", "LNAME", "localNameUpsert: " + name);
 		synchronized (WebInterface.LOCAL_NAMES) {
 			final BaseObject current = WebInterface.LOCAL_NAMES.get(name);
@@ -242,26 +242,14 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 		WebInterface.localNameInvalidate(name);
 		return true;
 	}
-
-	static final void registerTarget(final String target, final WebTarget instance) {
-
-		final RuntimeTarget runtimeTarget = new RuntimeTarget(//
-				target,
-				instance,
-				null /** no cleaning, WebInterface.queue */ //
-		);
-		synchronized (WebInterface.cache) {
-			WebInterface.cache.put(target, runtimeTarget);
-		}
-	}
-
+	
 	/** @param owner
 	 * @param context
 	 * @param result
 	 * @return */
 	@ReflectionExplicit
 	public static ReplyAnswer replyFromObject(final String owner, final WebContext<?> context, final BaseObject result) {
-
+		
 		if (result == null) {
 			return null;
 		}
@@ -342,14 +330,14 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 				.setAttribute("Content-Type", "text/plain") //
 				.setCode(Reply.CD_UNSUPPORTED_FORMAT);
 	}
-
+	
 	/** @param owner
 	 * @param context
 	 * @param result
 	 * @return */
 	@ReflectionHidden
 	public static ReplyAnswer replyFromObject(final String owner, final WebContext<?> context, final Object result) {
-
+		
 		if (result == null) {
 			return null;
 		}
@@ -427,12 +415,12 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 				.setAttribute("Content-Type", "text/plain") //
 				.setCode(Reply.CD_UNSUPPORTED_FORMAT);
 	}
-
+	
 	/** @param query
 	 * @param answer */
 	@ReflectionExplicit
 	public static void sendReply(final ServeRequest query, final ReplyAnswer answer) {
-
+		
 		assert query != null;
 		assert answer != null;
 		final Function<ReplyAnswer, Boolean> responseTarget;
@@ -453,13 +441,13 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 			return;
 		}
 	}
-
+	
 	/**
 	 *
 	 */
 	@ReflectionExplicit
 	public static final void startDefaultInterfaces() {
-
+		
 		synchronized (WebInterface.LOCK) {
 			if (WebInterface.started) {
 				return;
@@ -467,26 +455,26 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 			WebInterface.started = true;
 		}
 		WebInterface.LOG.event("WEB-IFACE", "START-DEFAULT", "Starting default interfaces...");
-
+		
 		if (!Evaluate.evaluateBoolean("require('ru.myx.ae3.internal/service/Service').start('web')", WebInterface.CTX, null)) {
 			throw new RuntimeException("Interfaces failed to start!");
 		}
-
+		
 		/** if (!Evaluate.evaluateBoolean(
 		 * "require('ru.myx.ae3.internal/interfaces/Default').start()", WebInterface.CTX, null )) {
 		 * throw new RuntimeException( "Interfaces failed to start!" ); } **/
-
+		
 		synchronized (WebInterface.LOCK) {
 			WebInterface.running = true;
 		}
 		WebInterface.LOG.event("WEB-IFACE", "START-DEFAULT", "Started default interfaces");
 	}
-
+	
 	/** @param timeout
 	 * @return */
 	@ReflectionExplicit
 	public static final boolean waitMore(final long timeout) {
-
+		
 		synchronized (WebInterface.LOCK) {
 			if (WebInterface.running) {
 				try {
@@ -498,39 +486,57 @@ public class WebInterface implements ObjectTarget<ServeRequest> {
 			return WebInterface.running;
 		}
 	}
-
+	
+	static final void registerTarget(final String target, final WebTarget instance) {
+		
+		final RuntimeTarget runtimeTarget = new RuntimeTarget(//
+				target,
+				instance,
+				null /** no cleaning, WebInterface.queue */ //
+		);
+		synchronized (WebInterface.cache) {
+			WebInterface.cache.put(target, runtimeTarget);
+		}
+	}
+	
 	/** Needs to be accessible, used in real startup script */
 	@ReflectionExplicit
 	public WebInterface() {
-
+		
 		//
 	}
-
+	
 	@Override
 	public boolean absorb(final ServeRequest query) {
-
+		
 		if (Report.MODE_DEBUG) {
 			WebInterface.LOG.event("WEB-IFACE", "QUERY-ABSORB", String.valueOf(query));
 		}
 		return WebInterface.dispatch(query);
 	}
-
+	
 	@Override
 	public Class<? extends ServeRequest> accepts() {
-
+		
 		return ServeRequest.class;
 	}
-
+	
 	@Override
 	public void close() {
-
+		
 		WebInterface.LOG.event("WEB-IFACE", "CLOSED", "Web Interface RequestHandler is closed.");
+	}
+	
+	@Override
+	public final String toString() {
+
+		return "[public " + this.getClass().getSimpleName() + "]";
 	}
 
 	/** @return */
 	@SuppressWarnings("static-method")
 	protected final boolean stop() {
-
+		
 		synchronized (WebInterface.LOCK) {
 			WebInterface.running = false;
 			WebInterface.stopped = true;
