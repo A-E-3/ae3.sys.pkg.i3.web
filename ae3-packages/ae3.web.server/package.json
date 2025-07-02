@@ -1,7 +1,7 @@
 {
-	"type" : "ae3.Package",
+	"type" : "commonjs",
 	"name" : "ae3.web.server",
-	"description" : "ae3.Package",
+	"description" : "Web Server Package",
 	"version" : "1.0",
 	"provides" : "web",
 	"requires" : "ae3.web"

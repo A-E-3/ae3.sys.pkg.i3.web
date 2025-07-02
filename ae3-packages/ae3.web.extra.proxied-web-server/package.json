@@ -1,5 +1,5 @@
 {
-	"type" : "ae3.Package",
+	"type" : "commonjs",
 	"name" : "ae3.web.extra.proxied-web-server",
 	"description" : "AE3 Web Extra: pre-configured direct web server settings (17080/17443)",
 	"requires" : ["ae3.net.tcp", "ae3.web" ]

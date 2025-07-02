@@ -1,5 +1,5 @@
 {
-	"type" : "ae3.Package",
+	"type" : "commonjs",
 	"name" : "ae3.web",
 	"description" : "AE3 Web Package",
 	"requires" : "ae3.network"

@@ -1,5 +1,5 @@
 {
-	"type" : "ae3.Package",
+	"type" : "commonjs",
 	"name" : "ae3.web.server-docs",
 	"description" : "ae3.web.* packages manuals, Documentation",
 	"requires" : [ "ae3.web", "ae3.manual" ]
