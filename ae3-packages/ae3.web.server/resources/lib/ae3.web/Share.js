@@ -382,11 +382,18 @@ const Share = module.exports = ae3.Class.create(
 					ip : query.sourceAddress,
 					format : format
 				};
+				
+				if( (admin = query.attributes["X-WebUI-CDN-URI"]) ){
+					result.webuiCdnBaseUri = admin;
+				}
+				
 				if(!client || client.id === 'guest'){
+
 					result.date = (new Date()).toISOString();
 					if(format !== 'clean'){
 						result.menu = !this.authRequired && this.clientElementMenuProperty(context) || undefined;
 					}
+
 					return result;
 				}
 				
