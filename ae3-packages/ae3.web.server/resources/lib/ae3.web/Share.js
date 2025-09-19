@@ -380,12 +380,9 @@ const Share = module.exports = ae3.Class.create(
 				const result = {
 					geo : query.attributes['Geo-Mean'],
 					ip : query.sourceAddress,
-					format : format
+					format : format,
+					webuiCdnBaseUri : query.attributes["X-WebUI-CDN-URI"] || undefined,
 				};
-				
-				if( (admin = query.attributes["X-WebUI-CDN-URI"]) ){
-					result.webuiCdnBaseUri = admin;
-				}
 				
 				if(!client || client.id === 'guest'){
 
