@@ -14,7 +14,7 @@ import ru.myx.ae3.xml.Xml;
 public class WebContextXml extends NativeTargetContext implements WebContext<NativeTargetContext> {
 
 	ServeRequest query;
-	
+
 	/** @param target
 	 * @param query
 	 */
@@ -23,16 +23,16 @@ public class WebContextXml extends NativeTargetContext implements WebContext<Nat
 		super(target, NativeTargetContext.TargetMode.CLONE);
 		this.query = query;
 	}
-	
+
 	@Override
 	public ServeRequest getQuery() {
-		
+
 		return this.query;
 	}
-	
+
 	@Override
 	public ReplyAnswer getResultReply() {
-		
+
 		final BaseObject resultLayout = this.getResultLayout();
 		if (resultLayout instanceof ReplyAnswer) {
 			return (ReplyAnswer) resultLayout;
