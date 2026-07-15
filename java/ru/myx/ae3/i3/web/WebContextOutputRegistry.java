@@ -35,11 +35,11 @@ import ru.myx.sapi.JsonSAPI;
  * }
  * </pre>
  *
- * "extensions" and "contentTypes" are both matched the exact same way, against either the
- * explicit "___output" request parameter or the request's file extension (mirroring the original
- * WebContextType enum, whose acceptExtensions and mimeTypes fed the very same lookup map - e.g.
- * "___output=text/html" has always been just as valid as "___output=html"). Two descriptors may
- * register the same value; the higher "priority" wins (a real number, not necessarily an integer).
+ * Matching is category-based:
+ * - extensions: implicit file-extension matching.
+ * - contentTypes: implicit MIME-like matching from request Accept tokens.
+ * - keywords: explicit ___output/API matching, populated from extensions, contentTypes and aliases.
+ * Two descriptors may register the same key; the higher "priority" wins.
  *
  * There's no separate "is this the default" flag - the auto-detect/no-explicit-output fallback is
  * configured the exact same way as everything else: a descriptor just lists
@@ -56,36 +56,203 @@ final class WebContextOutputRegistry extends SupplierVfsFolderMapCached {
 
 	private static final String JAVA_CLASS_PREFIX = "java.class/";
 
+	static final String AUTO_DETECT_SHORT_NAME = "auto-detect";
+
 	static final String WILDCARD_SHORT_NAME = "*";
+
+	static final String[] DEFAULT_MATCHER_SHORT_NAMES = new String[]{
+			WebContextOutputRegistry.AUTO_DETECT_SHORT_NAME,
+			WebContextOutputRegistry.WILDCARD_SHORT_NAME,
+	};
+
+	private static final String CATEGORY_CONTENT_TYPES = "contentTypes";
+
+	private static final String CATEGORY_EXTENSIONS = "extensions";
+
+	private static final String CATEGORY_KEYWORDS = "keywords";
 
 	static final WebContextOutputRegistry INSTANCE = new WebContextOutputRegistry(//
 			Storage.UNION.relative("settings/system/l3/targets", null));
 
 	/** @param shortName
-	 *            an explicit "___output" value, a request's file extension, or
-	 *            {@link #WILDCARD_SHORT_NAME}
+	 *            an explicit "___output" value
 	 * @param target
 	 * @param query
+	 * @param explicit
+	 *            true for explicit ___output/API selection; false for implicit selection
 	 * @return constructed WebContext, or null when nothing is registered for shortName or
 	 *         construction failed */
-	static WebContext<?> create(final String shortName, final TargetInterface target, final ServeRequest query) {
+	static WebContext<?> createByKeyword(final String shortName, final TargetInterface target, final ServeRequest query, final boolean explicit) {
 
-		final Object holder = WebContextOutputRegistry.INSTANCE.get().baseGet(shortName, BaseObject.UNDEFINED).baseValue();
-		if (!(holder instanceof RegisteredFactory)) {
+		final RegisteredFactory factory = WebContextOutputRegistry.getFactory(
+				WebContextOutputRegistry.CATEGORY_KEYWORDS,
+				shortName,
+				explicit);
+		if (factory == null) {
 			return null;
 		}
 		try {
-			return (WebContext<?>) ((RegisteredFactory) holder).constructor.newInstance(target, query);
+			return (WebContext<?>) factory.constructor.newInstance(target, query);
 		} catch (final Exception e) {
 			return null;
 		}
 	}
 
-	private static void register(final BaseMapEditable result, final String key, final RegisteredFactory factory) {
+	/** @param shortName
+	 *            file extension
+	 * @param target
+	 * @param query
+	 * @param explicit
+	 *            true for explicit ___output/API selection; false for implicit selection
+	 * @return constructed WebContext, or null when nothing is registered for shortName or
+	 *         construction failed */
+	static WebContext<?> createByExtension(final String shortName, final TargetInterface target, final ServeRequest query, final boolean explicit) {
 
-		final Object existing = result.baseGet(key, BaseObject.UNDEFINED).baseValue();
+		final RegisteredFactory factory = WebContextOutputRegistry.getFactory(
+				WebContextOutputRegistry.CATEGORY_EXTENSIONS,
+				shortName,
+				explicit);
+		if (factory == null) {
+			return null;
+		}
+		try {
+			return (WebContext<?>) factory.constructor.newInstance(target, query);
+		} catch (final Exception e) {
+			return null;
+		}
+	}
+
+	/** @param shortNames
+	 *            matcher short names to test as one candidate set (all matches considered)
+	 * @param target
+	 * @param query
+	 * @param explicit
+	 *            true for explicit ___output/API selection; false for implicit selection
+	 * @return constructed WebContext, or null when nothing is registered for shortName or
+	 *         construction failed */
+	static WebContext<?> createByKeywords(final String[] shortNames, final TargetInterface target, final ServeRequest query, final boolean explicit) {
+
+		final RegisteredFactory best = WebContextOutputRegistry.findBest(
+				WebContextOutputRegistry.CATEGORY_KEYWORDS,
+				shortNames,
+				explicit);
+		if (best == null) {
+			return null;
+		}
+		try {
+			return (WebContext<?>) best.constructor.newInstance(target, query);
+		} catch (final Exception e) {
+			return null;
+		}
+	}
+
+	/** @param shortNames
+	 *            content-type matcher values to test as one candidate set (all matches considered)
+	 * @param target
+	 * @param query
+	 * @param explicit
+	 *            true for explicit ___output/API selection; false for implicit selection
+	 * @return constructed WebContext, or null when nothing is registered for shortName or
+	 *         construction failed */
+	static WebContext<?> createByContentTypes(final String[] shortNames, final TargetInterface target, final ServeRequest query, final boolean explicit) {
+
+		final RegisteredFactory best = WebContextOutputRegistry.findBest(
+				WebContextOutputRegistry.CATEGORY_CONTENT_TYPES,
+				shortNames,
+				explicit);
+		if (best == null) {
+			return null;
+		}
+		try {
+			return (WebContext<?>) best.constructor.newInstance(target, query);
+		} catch (final Exception e) {
+			return null;
+		}
+	}
+
+	private static BaseMapEditable getCategoryMap(final BaseObject root, final String category) {
+
+		final BaseObject holder = root.baseGet(category, BaseObject.UNDEFINED);
+		if (holder instanceof BaseMapEditable) {
+			return (BaseMapEditable) holder;
+		}
+		return null;
+	}
+
+	private static RegisteredFactory findBest(final String category, final String[] shortNames, final boolean explicit) {
+
+		if (shortNames == null || shortNames.length == 0) {
+			return null;
+		}
+		RegisteredFactory best = null;
+		for (final String shortName : shortNames) {
+			final RegisteredFactory factory = WebContextOutputRegistry.getFactory(category, shortName, explicit);
+			if (factory == null) {
+				continue;
+			}
+			if (best == null || best.priority <= factory.priority) {
+				best = factory;
+			}
+		}
+		return best;
+	}
+
+	private static RegisteredFactory getFactory(final String category, final String key, final boolean explicit) {
+
+		final String normalized = WebContextOutputRegistry.normalizeKey(key);
+		if (normalized == null) {
+			return null;
+		}
+		final BaseMapEditable map = WebContextOutputRegistry.getCategoryMap(WebContextOutputRegistry.INSTANCE.get(), category);
+		if (map == null) {
+			return null;
+		}
+		final Object holder = map.baseGet(normalized, BaseObject.UNDEFINED).baseValue();
+		if (!(holder instanceof RegisteredFactory)) {
+			return null;
+		}
+		final RegisteredFactory factory = (RegisteredFactory) holder;
+		if (!explicit && factory.priority < 0) {
+			return null;
+		}
+		return factory;
+	}
+
+	private static String normalizeKey(final String key) {
+
+		if (key == null) {
+			return null;
+		}
+		final String normalized = key.trim().toLowerCase();
+		return normalized.length() == 0
+			? null
+			: normalized;
+	}
+
+	private static double normalizePriority(final double priority) {
+
+		if (priority < 0) {
+			return priority;
+		}
+		return priority > 1.0
+			? 1.0
+			: priority;
+	}
+
+	private static void register(final BaseMapEditable result, final String category, final String key, final RegisteredFactory factory) {
+
+		final String normalized = WebContextOutputRegistry.normalizeKey(key);
+		if (normalized == null) {
+			return;
+		}
+		BaseMapEditable map = WebContextOutputRegistry.getCategoryMap(result, category);
+		if (map == null) {
+			map = BaseObject.createObject();
+			result.putAppend(category, map);
+		}
+		final Object existing = map.baseGet(normalized, BaseObject.UNDEFINED).baseValue();
 		if (!(existing instanceof RegisteredFactory) || ((RegisteredFactory) existing).priority <= factory.priority) {
-			result.putAppend(key, Base.forUnknown(factory));
+			map.putAppend(normalized, Base.forUnknown(factory));
 		}
 	}
 
@@ -121,7 +288,11 @@ final class WebContextOutputRegistry extends SupplierVfsFolderMapCached {
 	@Override
 	protected BaseObject runDescriptorMapper(final Entry entry, final String name) {
 
-		return JsonSAPI.parse(Exec.currentProcess(), entry);
+		try {
+			return JsonSAPI.parse(Exec.currentProcess(), entry);
+		} catch (final Exception e) {
+			return BaseObject.UNDEFINED;
+		}
 	}
 
 	@Override
@@ -138,13 +309,18 @@ final class WebContextOutputRegistry extends SupplierVfsFolderMapCached {
 		} catch (final Exception e) {
 			return result;
 		}
-		final double priority = Base.getDouble(descriptor, "priority", 0);
+		final double priority = WebContextOutputRegistry.normalizePriority(Base.getDouble(descriptor, "priority", 0));
 		final RegisteredFactory factory = new RegisteredFactory(constructor, priority);
 		for (final String extension : WebContextOutputRegistry.stringArray(descriptor, "extensions")) {
-			WebContextOutputRegistry.register(result, extension, factory);
+			WebContextOutputRegistry.register(result, WebContextOutputRegistry.CATEGORY_EXTENSIONS, extension, factory);
+			WebContextOutputRegistry.register(result, WebContextOutputRegistry.CATEGORY_KEYWORDS, extension, factory);
+		}
+		for (final String alias : WebContextOutputRegistry.stringArray(descriptor, "aliases")) {
+			WebContextOutputRegistry.register(result, WebContextOutputRegistry.CATEGORY_KEYWORDS, alias, factory);
 		}
 		for (final String contentType : WebContextOutputRegistry.stringArray(descriptor, "contentTypes")) {
-			WebContextOutputRegistry.register(result, contentType, factory);
+			WebContextOutputRegistry.register(result, WebContextOutputRegistry.CATEGORY_CONTENT_TYPES, contentType, factory);
+			WebContextOutputRegistry.register(result, WebContextOutputRegistry.CATEGORY_KEYWORDS, contentType, factory);
 		}
 		return result;
 	}

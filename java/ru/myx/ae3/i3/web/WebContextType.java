@@ -1,5 +1,8 @@
 package ru.myx.ae3.i3.web;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import ru.myx.ae3.base.Base;
 import ru.myx.ae3.help.FileName;
 import ru.myx.ae3.i3.TargetInterface;
@@ -14,6 +17,38 @@ import ru.myx.ae3.serve.ServeRequest;
  * @author myx */
 final class WebContextType {
 
+	private static String[] parseAcceptContentTypes(final String acceptHeader) {
+
+		if (acceptHeader == null) {
+			return null;
+		}
+		final String value = acceptHeader.trim().toLowerCase();
+		if (value.length() == 0) {
+			return null;
+		}
+		final String[] parts = value.split(",");
+		final List<String> result = new ArrayList<>(parts.length);
+		for (final String part : parts) {
+			if (part == null) {
+				continue;
+			}
+			final String token = part.trim();
+			if (token.length() == 0) {
+				continue;
+			}
+			final int semicolon = token.indexOf(';');
+			final String contentType = semicolon >= 0
+				? token.substring(0, semicolon).trim()
+				: token;
+			if (contentType.length() > 0) {
+				result.add(contentType);
+			}
+		}
+		return result.isEmpty()
+			? null
+			: result.toArray(new String[result.size()]);
+	}
+
 	public static WebContext<?> createMatchingContext(
 			final TargetInterface target,
 			final ServeRequest query) {
@@ -24,7 +59,7 @@ final class WebContextType {
 		{
 			final String check = Base.getString( query.getParameters(), "___output", "" ).trim();
 			if (check.length() > 0) {
-				final WebContext<?> context = WebContextOutputRegistry.create( check, target, query );
+				final WebContext<?> context = WebContextOutputRegistry.createByKeyword( check, target, query, true );
 				if (context != null) {
 					return context;
 				}
@@ -37,19 +72,31 @@ final class WebContextType {
 			final String path = query.getResourceIdentifier();
 			final String check = FileName.extensionExact( path );
 			if (check != null && check.length() > 0) {
-				final WebContext<?> context = WebContextOutputRegistry.create( check, target, query );
+				final WebContext<?> context = WebContextOutputRegistry.createByExtension( check, target, query, false );
 				if (context != null) {
 					return context;
 				}
 			}
 		}
 		/**
-		 * auto-detect: neither an explicit ___output nor a recognized extension matched -
-		 * whichever unit's descriptor wins the wildcard shortName (by priority) decides what to
-		 * do, e.g. inspecting the Accept header itself
+		 * MIME-like detect by Accept content-types.
 		 */
 		{
-			final WebContext<?> context = WebContextOutputRegistry.create( WebContextOutputRegistry.WILDCARD_SHORT_NAME, target, query );
+			final String[] check = WebContextType.parseAcceptContentTypes(Base.getString(query.getAttributes(), "Accept", ""));
+			if (check != null) {
+				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes( check, target, query, false );
+				if (context != null) {
+					return context;
+				}
+			}
+		}
+		/**
+		 * auto-detect: neither explicit output, extension nor content-type matched.
+		 * matcher keywords are hardcoded and compared by priority: auto-detect and wildcard.
+		 */
+		{
+			final WebContext<?> context =
+					WebContextOutputRegistry.createByKeywords( WebContextOutputRegistry.DEFAULT_MATCHER_SHORT_NAMES, target, query, false );
 			if (context != null) {
 				return context;
 			}
