@@ -4,12 +4,13 @@ Base Web (UI) SDK: the HTTP-facing dispatch layer. Requires `ae3.api`, `ae3.sdk`
 
 ## Content-type dispatch: JSON-registry-driven, no hardcoded WebContext subclasses
 
-`java/ru/myx/ae3/i3/web/WebContextType.java` resolves which `WebContext` implementation handles a request, each step delegating to `WebContextOutputRegistry.create(shortName, target, query)`:
+`java/ru/myx/ae3/i3/web/WebContextType.java` is the reply-format dispatcher. `WebContextType.createMatchingContext(target, query)` resolves which `WebContext` implementation handles a request, in this order, each step delegating to a different `WebContextOutputRegistry` lookup method:
 
-1. explicit `___output` query parameter, looked up as a shortName
-2. file extension on the resource path, looked up as a shortName
-3. auto-detect: wildcard shortName `"*"`
-4. fallback: hardcoded `new WebContextSimple(target, query)` — the only `WebContext` class this unit still constructs directly, and the only one that still physically lives here
+1. explicit `___output` query parameter, looked up as a shortName via `createByKeyword(...)`
+2. file extension on the resource path (`FileName.extensionExact`), looked up as a shortName via `createByExtension(...)`
+3. `Accept` request header, parsed into content-type tokens (`WebContextType.parseAcceptContentTypes`, strips `;q=...` parameters off each comma-separated entry) and matched via `createByContentTypes(...)` — lets a plain browser/client request (no `___output`, no recognized extension) still get content-negotiated instead of falling straight to auto-detect
+4. auto-detect: `createByKeywords(WebContextOutputRegistry.DEFAULT_MATCHER_SHORT_NAMES, ...)` — the wildcard shortName, for when none of the above matched anything
+5. fallback: hardcoded `new WebContextSimple(target, query)` — the only WebContext class this unit still constructs directly (also the only WebContext-implementing class that still physically lives here — it's the generic "nothing else applies" case with no owning target unit), used only when even the wildcard has nothing registered
 
 `WebContextOutputRegistry` (same package) scans `/union/settings/system/l3/targets/*.json` for `{"extensions":[...], "contentTypes":[...], "priority":0, "context":{"reference":"java.class/FQCN"}}` — `extensions` and `contentTypes` feed the same shortName lookup (`___output=text/html` is as valid as `___output=html`), higher `priority` wins ties. This unit ships no descriptors of its own — each unit that implements a target/output contributes its own (see `ae3-packages/ae3.web/settings/system/l3/targets/README.md`).
 

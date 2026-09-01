@@ -190,7 +190,7 @@ final class WebContextOutputRegistry extends SupplierVfsFolderMapCached {
 			if (factory == null) {
 				continue;
 			}
-			if (best == null || best.priority <= factory.priority) {
+			if (best == null || best.priority < factory.priority) {
 				best = factory;
 			}
 		}
@@ -251,7 +251,7 @@ final class WebContextOutputRegistry extends SupplierVfsFolderMapCached {
 			result.putAppend(category, map);
 		}
 		final Object existing = map.baseGet(normalized, BaseObject.UNDEFINED).baseValue();
-		if (!(existing instanceof RegisteredFactory) || ((RegisteredFactory) existing).priority <= factory.priority) {
+		if (!(existing instanceof RegisteredFactory) || ((RegisteredFactory) existing).priority < factory.priority) {
 			map.putAppend(normalized, Base.forUnknown(factory));
 		}
 	}

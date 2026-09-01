@@ -17,6 +17,8 @@ import ru.myx.ae3.serve.ServeRequest;
  * @author myx */
 final class WebContextType {
 
+	static final String[] XHTML_CONTENT_TYPES = new String[]{"application/xhtml+xml"};
+
 	private static String[] parseAcceptContentTypes(final String acceptHeader) {
 
 		if (acceptHeader == null) {
@@ -82,7 +84,15 @@ final class WebContextType {
 		 * MIME-like detect by Accept content-types.
 		 */
 		{
-			final String[] check = WebContextType.parseAcceptContentTypes(Base.getString(query.getAttributes(), "Accept", ""));
+			final String accept = Base.getString(query.getAttributes(), "Accept", "");
+			if (accept.contains("application/xhtml+xml")) {
+				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(
+						WebContextType.XHTML_CONTENT_TYPES, target, query, false );
+				if (context != null) {
+					return context;
+				}
+			}
+			final String[] check = WebContextType.parseAcceptContentTypes(accept);
 			if (check != null) {
 				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes( check, target, query, false );
 				if (context != null) {
