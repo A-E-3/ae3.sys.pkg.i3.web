@@ -1783,8 +1783,7 @@ final class SocketHandler implements TransferTarget, Function<ReplyAnswer, Boole
 			final TransferDescription description = this.socket.getTransferDescription();
 			if (description.isReplaceable(null)) {
 				final Object transferClass = Base.getJava(attributes, "Transfer-Class", null);
-				if (transferClass != null && transferClass instanceof TransferDescription) {
-					final TransferDescription substitute = (TransferDescription) transferClass;
+				if (transferClass instanceof final TransferDescription substitute) {
 					if (description.isReplaceable(substitute)) {
 						this.socket.setTransferDescription(substitute);
 					} else {

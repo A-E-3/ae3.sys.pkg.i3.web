@@ -135,7 +135,7 @@ fires: a temporary diagnostic (added, exercised, then fully reverted before land
 tier-3 substitution resolves to `ru.myx.ae3.l2.xml.WebContextXmlAutoDetect` for both
 `browser-typical` and `xml-explicit` Accept headers, and correctly does not fire for
 `xhtml-explicit` (already resolves to the more-specific `WebContextXmlXhtml`). `curl`-level output
-from `unit-test/magic-tester/verify-ae3-web-dispatch.sh run`, run immediately before and after the
+from `unit-test/magic-tester/verify-ae3-web-dispatch.test.sh run`, run immediately before and after the
 change, was unchanged either side against `Host: ae3.local`'s welcome page — **not a fix failure**:
 that page's `resultLayout` is already a final `ReplyAnswer` (see the welcome-page bullet above),
 which both `WebContextXml` and `WebContextXmlAutoDetect` pass through unchanged by design regardless
@@ -157,7 +157,7 @@ above, not demonstrate anything about the fix.
 ## Dispatch-race fix's visible render effect — first real empirical proof, 2026-08-26
 
 Closes the gap this file's own "Verification" section above left open ("neither locally-reachable
-probe target can exercise this fix's visible effect"). `unit-test/magic-tester/verify-ae3-web-dispatch.sh`
+probe target can exercise this fix's visible effect"). `unit-test/magic-tester/verify-ae3-web-dispatch.test.sh`
 gained two dedicated test pages (`run-testpages` / `probe-testpages`, `testpages/` subfolder — see
 `unit-test/magic-tester/README.md`) whose resolved layout genuinely is `{layout:"xml", xsl:...,
 content:...}` and is not already a final `ReplyAnswer` — the shape the welcome page and a 404 both
