@@ -4,20 +4,23 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ru.myx.ae3.base.Base;
+import ru.myx.ae3.base.BaseString;
 import ru.myx.ae3.help.FileName;
 import ru.myx.ae3.i3.TargetInterface;
 import ru.myx.ae3.serve.ServeRequest;
 
 /** Reply-format dispatcher. All shortName -&gt; WebContext wiring lives in
  * {@link WebContextOutputRegistry}'s JSON descriptors under /union/settings/system/l3/targets/,
- * contributed by whichever unit actually implements a given target/output - this class hardcodes
- * no WebContext subclass itself (see settings/system/l3/targets/README in this unit's
- * ae3-packages folder for why: this unit only dispatches, it doesn't implement targets).
+ * contributed by whichever unit actually implements a given target/output - this class hardcodes no
+ * WebContext subclass itself (see settings/system/l3/targets/README in this unit's ae3-packages
+ * folder for why: this unit only dispatches, it doesn't implement targets).
  *
  * @author myx */
 final class WebContextType {
 
-	static final String[] XHTML_CONTENT_TYPES = new String[]{"application/xhtml+xml"};
+	static final String[] XHTML_CONTENT_TYPES = new String[]{
+			"application/xhtml+xml"
+	};
 
 	private static String[] parseAcceptContentTypes(final String acceptHeader) {
 
@@ -51,71 +54,63 @@ final class WebContextType {
 			: result.toArray(new String[result.size()]);
 	}
 
-	public static WebContext<?> createMatchingContext(
-			final TargetInterface target,
-			final ServeRequest query) {
+	public static WebContext<?> createMatchingContext(final TargetInterface target, final ServeRequest query) {
 
-		/**
-		 * explicit
-		 */
+		/** explicit */
 		{
-			final String check = Base.getString( query.getParameters(), "___output", "" ).trim();
+			final String check = Base.getString(query.getParameters(), "___output", "").trim();
 			if (check.length() > 0) {
-				final WebContext<?> context = WebContextOutputRegistry.createByKeyword( check, target, query, true );
+				final WebContext<?> context = WebContextOutputRegistry.createByKeyword(check, target, query, true);
 				if (context != null) {
 					return context;
 				}
 			}
 		}
-		/**
-		 * extension
-		 */
+		/** extension */
 		{
 			final String path = query.getResourceIdentifier();
-			final String check = FileName.extensionExact( path );
+			final String check = FileName.extensionExact(path);
 			if (check != null && check.length() > 0) {
-				final WebContext<?> context = WebContextOutputRegistry.createByExtension( check, target, query, false );
+				final WebContext<?> context = WebContextOutputRegistry.createByExtension(check, target, query, false);
 				if (context != null) {
 					return context;
 				}
 			}
 		}
-		/**
-		 * MIME-like detect by Accept content-types.
-		 */
+		/** MIME-like detect by Accept content-types. */
 		{
 			final String accept = Base.getString(query.getAttributes(), "Accept", "");
-			if (accept.contains("application/xhtml+xml")) {
-				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(
-						WebContextType.XHTML_CONTENT_TYPES, target, query, false );
+			if (accept.contains("application/xhtml+xml") //
+					&& BaseString.STR_FALSE != Base.get(query.getParameters(), "___output-client-detect", null)) {
+				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(//
+						WebContextType.XHTML_CONTENT_TYPES,
+						target,
+						query,
+						false //
+				);
 				if (context != null) {
 					return context;
 				}
 			}
 			final String[] check = WebContextType.parseAcceptContentTypes(accept);
 			if (check != null) {
-				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes( check, target, query, false );
+				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(check, target, query, false);
 				if (context != null) {
 					return context;
 				}
 			}
 		}
-		/**
-		 * auto-detect: neither explicit output, extension nor content-type matched.
-		 * matcher keywords are hardcoded and compared by priority: auto-detect and wildcard.
-		 */
+		/** auto-detect: neither explicit output, extension nor content-type matched. matcher
+		 * keywords are hardcoded and compared by priority: auto-detect and wildcard. */
 		{
-			final WebContext<?> context =
-					WebContextOutputRegistry.createByKeywords( WebContextOutputRegistry.DEFAULT_MATCHER_SHORT_NAMES, target, query, false );
+			final WebContext<?> context = WebContextOutputRegistry.createByKeywords(WebContextOutputRegistry.DEFAULT_MATCHER_SHORT_NAMES, target, query, false);
 			if (context != null) {
 				return context;
 			}
 		}
-		/**
-		 * bugger all - nothing registered even for the wildcard
-		 */
+		/** bugger all - nothing registered even for the wildcard */
 		{
-			return new WebContextSimple( target, query );
+			return new WebContextSimple(target, query);
 		}
 	}
 

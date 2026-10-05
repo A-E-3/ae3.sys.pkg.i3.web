@@ -260,3 +260,31 @@ header) has to split on commas itself first, then call this per token.
 ad-hoc parse of the `Accept` header that discards parameters and q-values entirely rather than
 extracting and using them. Confirmed gap, not yet fixed — flagged here for future work, not addressed
 in this pass.
+
+## `___output-client-detect=false` switches client detection off
+
+The value is compared by identity with `BaseString.STR_FALSE`, in `WebContextType`'s tier 3 and in
+`XslServerRender.acceptsXhtml` (`ae3.sys.pkg.l2.tgt.xml`). A repeated parameter makes a list and does
+not match.
+
+## Keep-alive: a reply delay is set once, and the restore runs after the reply is written
+
+- `SocketHandler.startRender` sets `IDLE_UNLIMITED` before it queues the reply bytes for `CD_DENIED`,
+  `CD_BUSY` and `CD_BADRANGE`, and for `CD_UNKNOWN`, `CD_BADQUERY`, `CD_BADMETHOD` and
+  `CD_UNIMPLEMENTED` unless the reply carries `X-Delay=FALSE`. `NioSocket.buffersAdd` (`ae3.sys`) sends
+  the first buffer of a write burst to `waitWrite(4000)` when the class priority is at or below
+  `PC_IDLE`.
+- The restore runs in `KeepAliveParserConnector.reconnect`, inside the action `executeDone` queues
+  behind the reply write buffers: after they are consumed, before the read side reconnects. It sets
+  `DEFAULT_UNLIMITED` only when the current class is `IDLE_UNLIMITED` by identity.
+- The server handles one request at a time per connection. `onDoneRead` disconnects the read target,
+  and early bytes wait in the kernel or in `directReadBuffer`.
+- `HandlerQueue` pools `SocketHandler` objects, so a parser is new per request while the socket is
+  reused. `KeepAliveParserConnector.absorb*` is where the first bytes of the next request pick up a
+  parser. The legacy and devel copies of `SocketHandler.java` differ in line count, so cite file and
+  method, not lines.
+- Live check that showed no delay spill: one `curl` with two URLs on one connection, a nonexistent path
+  first (404, about 4 seconds of delay), then a page that returns 200. The second request is fast when
+  the connect count is 0 and its time is about 0.02 s, compared with a fresh connection to the same
+  URL.
+- The traffic class itself lives on the `NioSocket`, see `ae3.sys`'s own MAGIC.md.
