@@ -64,13 +64,14 @@ in order, and returns on the first non-null match:
    `WebContextOutputRegistry.createByKeywords(DEFAULT_MATCHER_SHORT_NAMES, ...)`, only reached once
    steps 1-3 all miss.
 
-**Tier-3 fast path.** Before the general comma-split/parse, `createMatchingContext` checks the raw
-`Accept` header for the literal substring `application/xhtml+xml` and, on a match, calls
-`WebContextOutputRegistry.createByContentTypes` with a single-element array holding just that
-content type (`WebContextType.XHTML_CONTENT_TYPES`, a `static final` constant, not allocated per
-call). This can only reach the same outcome the general parse path would reach for that token — it
-short-circuits the common case, never changes what's accepted. Any header without that exact
-substring falls through to the general parse unaffected.
+**Tier-3 carries no xhtml-specific logic at all.** The former fast-path shortcut (a raw substring
+check for `application/xhtml+xml`) was removed first; the general parse's later blanket exclusion of
+that same token is now reverted too. `parseAcceptContentTypes` (`WebContextType.java:20`) parses
+every Accept token the same way, with no xhtml awareness — this package holds no knowledge of the
+`application/xhtml+xml` token. An Accept header carrying it still never resolves a context at tier 3:
+`xhtml.json` (`ae3.sys.pkg.l2.tgt.xml`) registers no `contentTypes` entry for it, only `extensions`,
+so there is nothing for the registry to match, and it falls through to tier 4 auto-detect. See
+"`___output-client-detect=false` switches client detection off" below.
 
 Step 3's tie-break is last-Accept-token-wins, not a numbered priority tier:
 `WebContextOutputRegistry.findBest` (`WebContextOutputRegistry.java:182-198`) iterates the Accept
@@ -263,9 +264,14 @@ in this pass.
 
 ## `___output-client-detect=false` switches client detection off
 
-The value is compared by identity with `BaseString.STR_FALSE`, in `WebContextType`'s tier 3 and in
-`XslServerRender.acceptsXhtml` (`ae3.sys.pkg.l2.tgt.xml`). A repeated parameter makes a list and does
-not match.
+Read in exactly one place: `XslServerRender.acceptsXhtml` (`ae3.sys.pkg.l2.tgt.xml`) — the sole place
+in this dispatch chain that knows the `application/xhtml+xml` token or decides anything about it.
+This package (`WebContextType`) carries no xhtml-specific logic and does not read this parameter:
+tier 3 never resolves xhtml (`xhtml.json` registers no `contentTypes` entry for it), so any
+Accept-based xhtml decision always falls through to tier 4, where this parameter is the sole
+remaining gate. `XslServerRender` compares against the shared `MimeType.SMT_APPLICATION_XHTML_XML`
+constant (`ae3.sdk`), never a local copy of the literal. The value is compared by identity with
+`BaseString.STR_FALSE`. A repeated parameter makes a list and does not match.
 
 ## Keep-alive: a reply delay is set once, and the restore runs after the reply is written
 

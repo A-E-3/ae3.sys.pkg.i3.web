@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import ru.myx.ae3.base.Base;
-import ru.myx.ae3.base.BaseString;
 import ru.myx.ae3.help.FileName;
 import ru.myx.ae3.i3.TargetInterface;
 import ru.myx.ae3.serve.ServeRequest;
@@ -17,13 +16,9 @@ import ru.myx.ae3.serve.ServeRequest;
  *
  * @author myx */
 final class WebContextType {
-
-	static final String[] XHTML_CONTENT_TYPES = new String[]{
-			"application/xhtml+xml"
-	};
-
+	
 	private static String[] parseAcceptContentTypes(final String acceptHeader) {
-
+		
 		if (acceptHeader == null) {
 			return null;
 		}
@@ -53,9 +48,9 @@ final class WebContextType {
 			? null
 			: result.toArray(new String[result.size()]);
 	}
-
+	
 	public static WebContext<?> createMatchingContext(final TargetInterface target, final ServeRequest query) {
-
+		
 		/** explicit */
 		{
 			final String check = Base.getString(query.getParameters(), "___output", "").trim();
@@ -80,18 +75,6 @@ final class WebContextType {
 		/** MIME-like detect by Accept content-types. */
 		{
 			final String accept = Base.getString(query.getAttributes(), "Accept", "");
-			if (accept.contains("application/xhtml+xml") //
-					&& BaseString.STR_FALSE != Base.get(query.getParameters(), "___output-client-detect", null)) {
-				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(//
-						WebContextType.XHTML_CONTENT_TYPES,
-						target,
-						query,
-						false //
-				);
-				if (context != null) {
-					return context;
-				}
-			}
 			final String[] check = WebContextType.parseAcceptContentTypes(accept);
 			if (check != null) {
 				final WebContext<?> context = WebContextOutputRegistry.createByContentTypes(check, target, query, false);
@@ -113,9 +96,9 @@ final class WebContextType {
 			return new WebContextSimple(target, query);
 		}
 	}
-
+	
 	private WebContextType() {
-
+		
 		// static utility, not instantiable
 	}
 }
